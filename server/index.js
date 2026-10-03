@@ -14,28 +14,25 @@ import { top, records, closeDb } from './db.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Vite erstellt das fertige Frontend in client/dist
-const clientDir = path.join(__dirname, '../client/dist');
+// Vite Production Build
+const dist = path.join(__dirname, '../client/dist');
 
 const app = express();
-const server = http.createServer(app);
-
-const io = new Server(server, {
-  cors: {
-    origin: false
-  }
-});
 
 app.set('trust proxy', 1);
-
-app.use(express.json());
+app.disable('x-powered-by');
 
 app.use(
+  express.json({
+    limit: '10kb'
+  })
+);
+
+app.use(
+  '/api',
   rateLimit({
-    windowMs: 60 * 1000,
-    max: 300,
-    standardHeaders: true,
-    legacyHeaders: false
+    windowMs: 60000,
+    limit: 180
   })
 );
 
@@ -43,9 +40,10 @@ app.use(
 // CONFIG
 // --------------------------------------------------
 
-app.get('/api/config', (req, res) => {
+app.get('/api/config', (_, res) => {
   res.json({
-    allowGuest: process.env.ALLOW_GUEST !== 'false'
+    clientId: process.env.DISCORD_CLIENT_ID || '',
+    guest: process.env.ALLOW_GUEST === 'true'
   });
 });
 
@@ -53,314 +51,794 @@ app.get('/api/config', (req, res) => {
 // LEADERBOARD
 // --------------------------------------------------
 
-app.get('/api/leaderboard', (req, res) => {
-  try {
-    res.json({
-      top: top(10),
-      records: records()
-    });
-  } catch (error) {
-    console.error('Leaderboard Fehler:', error);
+app.get('/api/leaderboard', (_, res) => {
+  res.json({
+    top: top(10),
+    records: records()
+  });
+});
 
+// --------------------------------------------------
+// DISCORD OAUTH TOKEN
+// --------------------------------------------------
+
+app.post('/api/token', async (req, res) => {
+  const code = req.body?.code;
+
+  if (typeof code !== 'string' || code.length > 200) {
+    return res.status(400).json({
+      error: 'bad code'
+    });
+  }
+
+  try {
+    const r = await fetch(
+      'https://discord.com/api/oauth2/token',
+      {
+        method: 'POST',
+
+        headers: {
+          'Content-Type':
+            'application/x-www-form-urlencoded'
+        },
+
+        body: new URLSearchParams({
+          client_id:
+            process.env.DISCORD_CLIENT_ID || '',
+
+          client_secret:
+            process.env.DISCORD_CLIENT_SECRET || '',
+
+          grant_type:
+            'authorization_code',
+
+          code
+        })
+      }
+    );
+
+    const d = await r.json();
+
+    if (!r.ok) {
+      return res.status(400).json({
+        error: 'discord rejected'
+      });
+    }
+
+    res.json({
+      access_token: d.access_token
+    });
+  } catch {
     res.status(500).json({
-      error: 'Leaderboard konnte nicht geladen werden.'
+      error: 'token error'
     });
   }
 });
 
 // --------------------------------------------------
-// DISCORD LOGIN TOKEN
+// FRONTEND
 // --------------------------------------------------
 
-app.get('/api/token', (req, res) => {
-  const payload = String(req.query.payload || '');
-  const signature = String(req.query.signature || '');
+app.use(express.static(dist));
 
-  if (!payload || !signature) {
-    return res.status(400).json({
-      error: 'Token fehlt.'
-    });
+// --------------------------------------------------
+// SERVER + SOCKET.IO
+// --------------------------------------------------
+
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  maxHttpBufferSize: 4096,
+
+  cors: {
+    origin: false
+  }
+});
+
+// --------------------------------------------------
+// ROOMS
+// --------------------------------------------------
+
+const rooms = new Map();
+
+const alphabet =
+  'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+function code() {
+  let c = '';
+
+  do {
+    c = '';
+
+    for (let i = 0; i < 6; i++) {
+      c +=
+        alphabet[
+          Math.floor(
+            Math.random() * alphabet.length
+          )
+        ];
+    }
+  } while (rooms.has(c));
+
+  return c;
+}
+
+function cleanCode(c) {
+  return String(c || '')
+    .toUpperCase()
+    .replace(/[^A-Z2-9]/g, '')
+    .slice(0, 6);
+}
+
+function cleanName(n) {
+  return String(n || '')
+    .replace(/[^\p{L}\p{N} _-]/gu, '')
+    .trim()
+    .slice(0, 16);
+}
+
+// --------------------------------------------------
+// GUEST ID
+// --------------------------------------------------
+
+function guestId(socket, device) {
+  const raw =
+    socket.handshake.address || 'unknown';
+
+  const safeDevice = String(
+    device || 'device'
+  )
+    .replace(/[^a-zA-Z0-9_-]/g, '')
+    .slice(0, 64);
+
+  const secret =
+    process.env.IP_HASH_SECRET ||
+    process.env.DISCORD_CLIENT_SECRET ||
+    'china-chaos-local-dev';
+
+  return (
+    'ip-' +
+    crypto
+      .createHmac('sha256', secret)
+      .update(raw + '|' + safeDevice)
+      .digest('hex')
+      .slice(0, 24)
+  );
+}
+
+// --------------------------------------------------
+// DISCORD USER VERIFY
+// --------------------------------------------------
+
+async function verify(token, name) {
+  const r = await fetch(
+    'https://discord.com/api/users/@me',
+    {
+      headers: {
+        Authorization:
+          'Bearer ' + token
+      }
+    }
+  );
+
+  if (!r.ok) {
+    return null;
   }
 
-  const secret = process.env.IP_HASH_SECRET;
+  const u = await r.json();
 
-  if (!secret) {
-    return res.status(500).json({
-      error: 'IP_HASH_SECRET fehlt.'
-    });
-  }
+  return {
+    id: u.id,
 
+    name:
+      cleanName(name) ||
+      cleanName(
+        u.global_name || u.username
+      ) ||
+      'Spieler',
+
+    avatar: u.avatar
+      ? `https://cdn.discordapp.com/avatars/${u.id}/${u.avatar}.png?size=64`
+      : ''
+  };
+}
+
+// --------------------------------------------------
+// SIGNED /CHINA LOGIN
+// --------------------------------------------------
+
+function verifyLinkAuth(ticket, name) {
   try {
+    const [payload, sig] =
+      String(ticket || '').split('.');
+
+    if (!payload || !sig) {
+      return null;
+    }
+
+    const secret =
+      process.env.IP_HASH_SECRET ||
+      process.env.DISCORD_CLIENT_SECRET;
+
+    if (!secret) {
+      return null;
+    }
+
     const expected = crypto
       .createHmac('sha256', secret)
       .update(payload)
-      .digest('hex');
+      .digest();
 
-    const a = Buffer.from(signature);
-    const b = Buffer.from(expected);
+    const got =
+      Buffer.from(sig, 'base64url');
 
     if (
-      a.length !== b.length ||
-      !crypto.timingSafeEqual(a, b)
+      got.length !== expected.length ||
+      !crypto.timingSafeEqual(
+        got,
+        expected
+      )
     ) {
-      return res.status(401).json({
-        error: 'Ungültige Signatur.'
-      });
+      return null;
     }
 
-    const decoded = JSON.parse(
-      Buffer.from(payload, 'base64url').toString('utf8')
+    const d = JSON.parse(
+      Buffer.from(
+        payload,
+        'base64url'
+      ).toString('utf8')
     );
 
-    if (!decoded.exp || Date.now() > decoded.exp) {
-      return res.status(401).json({
-        error: 'Login ist abgelaufen.'
-      });
+    if (
+      !d.id ||
+      !d.exp ||
+      Date.now() > d.exp
+    ) {
+      return null;
     }
 
-    return res.json({
-      ok: true,
-      user: decoded
-    });
-  } catch (error) {
-    console.error('Token Fehler:', error);
+    return {
+      id: String(d.id),
 
-    return res.status(400).json({
-      error: 'Ungültiger Login.'
-    });
+      name:
+        cleanName(name) ||
+        cleanName(d.name) ||
+        'Spieler',
+
+      avatar: String(
+        d.avatar || ''
+      ).slice(0, 500)
+    };
+  } catch {
+    return null;
   }
+}
+
+// --------------------------------------------------
+// SOCKET CONNECTION
+// --------------------------------------------------
+
+io.on('connection', socket => {
+  let game = null;
+  let uid = null;
+  let msgs = 0;
+
+  const bucket = setInterval(
+    () => {
+      msgs = 0;
+    },
+    1000
+  );
+
+  const ok = () => ++msgs <= 120;
+
+  // ------------------------------------------------
+  // CREATE ROOM
+  // ------------------------------------------------
+
+  socket.on('create', async d => {
+    if (game) return;
+
+    let user = null;
+
+    try {
+      if (d?.auth) {
+        user = verifyLinkAuth(
+          d.auth,
+          d.name
+        );
+      } else if (d?.token) {
+        user = await verify(
+          d.token,
+          d.name
+        );
+      } else if (
+        process.env.ALLOW_GUEST ===
+        'true'
+      ) {
+        const name =
+          cleanName(d?.name);
+
+        if (name.length < 2) {
+          return socket.emit(
+            'err',
+            'Name muss 2–16 Zeichen haben.'
+          );
+        }
+
+        user = {
+          id: guestId(
+            socket,
+            d?.device
+          ),
+
+          name,
+
+          avatar: ''
+        };
+      }
+    } catch {}
+
+    if (!user) {
+      return socket.emit(
+        'err',
+        'Login fehlgeschlagen'
+      );
+    }
+
+    user.skin = [
+      'discord',
+      'flag',
+      'letter'
+    ].includes(d?.skin)
+      ? d.skin
+      : 'letter';
+
+    if (
+      user.skin === 'discord' &&
+      !user.avatar
+    ) {
+      user.skin = 'letter';
+    }
+
+    const room = code();
+
+    // WICHTIG:
+    // Game erwartet:
+    // new Game(roomID, socketIO, onRecord)
+    game = new Game(
+      room,
+      io,
+      announceRecord
+    );
+
+    rooms.set(room, game);
+
+    game.join(
+      user,
+      socket.id
+    );
+
+    uid = user.id;
+
+    socket.join(room);
+
+    socket.emit('joined', {
+      id: uid,
+      room
+    });
+  });
+
+  // ------------------------------------------------
+  // JOIN ROOM
+  // ------------------------------------------------
+
+  socket.on('join', async d => {
+    if (game) return;
+
+    const room =
+      cleanCode(d?.room);
+
+    const g =
+      rooms.get(room);
+
+    if (!g) {
+      return socket.emit(
+        'err',
+        'Gruppe nicht gefunden.'
+      );
+    }
+
+    let user = null;
+
+    try {
+      if (d?.auth) {
+        user = verifyLinkAuth(
+          d.auth,
+          d.name
+        );
+      } else if (d?.token) {
+        user = await verify(
+          d.token,
+          d.name
+        );
+      } else if (
+        process.env.ALLOW_GUEST ===
+        'true'
+      ) {
+        const name =
+          cleanName(d?.name);
+
+        if (name.length < 2) {
+          return socket.emit(
+            'err',
+            'Name muss 2–16 Zeichen haben.'
+          );
+        }
+
+        user = {
+          id: guestId(
+            socket,
+            d?.device
+          ),
+
+          name,
+
+          avatar: ''
+        };
+      }
+    } catch {}
+
+    if (!user) {
+      return socket.emit(
+        'err',
+        'Login fehlgeschlagen'
+      );
+    }
+
+    user.skin = [
+      'discord',
+      'flag',
+      'letter'
+    ].includes(d?.skin)
+      ? d.skin
+      : 'letter';
+
+    if (
+      user.skin === 'discord' &&
+      !user.avatar
+    ) {
+      user.skin = 'letter';
+    }
+
+    if (
+      !g.join(
+        user,
+        socket.id
+      )
+    ) {
+      return socket.emit(
+        'err',
+        'Gruppe ist voll.'
+      );
+    }
+
+    game = g;
+    uid = user.id;
+
+    socket.join(room);
+
+    socket.emit('joined', {
+      id: uid,
+      room
+    });
+  });
+
+  // ------------------------------------------------
+  // MOVEMENT
+  // ------------------------------------------------
+
+  socket.on('input', d => {
+    if (
+      game &&
+      ok() &&
+      d
+    ) {
+      game.setInput(
+        uid,
+        d.dx,
+        d.dy
+      );
+    }
+  });
+
+  // ------------------------------------------------
+  // PICKUP
+  // ------------------------------------------------
+
+  socket.on('pickup', d => {
+    if (
+      game &&
+      ok() &&
+      d
+    ) {
+      game.tryPickup(
+        uid,
+        d.id,
+        d.x,
+        d.y
+      );
+    }
+  });
+
+  // ------------------------------------------------
+  // READY
+  // ------------------------------------------------
+
+  socket.on('ready', v => {
+    if (
+      game &&
+      ok()
+    ) {
+      game.setReady(
+        uid,
+        v
+      );
+    }
+  });
+
+  // ------------------------------------------------
+  // DIFFICULTY
+  // ------------------------------------------------
+
+  socket.on(
+    'difficulty',
+    v => {
+      if (
+        game &&
+        ok()
+      ) {
+        game.setDifficulty(
+          uid,
+          v
+        );
+      }
+    }
+  );
+
+  // ------------------------------------------------
+  // MODE
+  // ------------------------------------------------
+
+  socket.on('mode', v => {
+    if (
+      game &&
+      ok()
+    ) {
+      game.setMode(
+        uid,
+        v
+      );
+    }
+  });
+
+  // ------------------------------------------------
+  // BATTLE TYPE
+  // ------------------------------------------------
+
+  socket.on(
+    'battleType',
+    v => {
+      if (
+        game &&
+        ok()
+      ) {
+        game.setBattleType(
+          uid,
+          v
+        );
+      }
+    }
+  );
+
+  // ------------------------------------------------
+  // MAP
+  // ------------------------------------------------
+
+  socket.on('map', v => {
+    if (
+      game &&
+      ok()
+    ) {
+      game.setMap(
+        uid,
+        v
+      );
+    }
+  });
+
+  // ------------------------------------------------
+  // AIM
+  // ------------------------------------------------
+
+  socket.on('aim', d => {
+    if (
+      game &&
+      ok() &&
+      d
+    ) {
+      game.setAim(
+        uid,
+        d.x,
+        d.y
+      );
+    }
+  });
+
+  // ------------------------------------------------
+  // SHOOT
+  // ------------------------------------------------
+
+  socket.on('shoot', () => {
+    if (
+      game &&
+      ok()
+    ) {
+      game.shoot(uid);
+    }
+  });
+
+  // ------------------------------------------------
+  // RELOAD
+  // ------------------------------------------------
+
+  socket.on('reload', () => {
+    if (
+      game &&
+      ok()
+    ) {
+      game.reload(uid);
+    }
+  });
+
+  // ------------------------------------------------
+  // SWITCH WEAPON
+  // ------------------------------------------------
+
+  socket.on('switch', v => {
+    if (
+      game &&
+      ok()
+    ) {
+      game.switchWeapon(
+        uid,
+        v
+      );
+    }
+  });
+
+  // ------------------------------------------------
+  // START GAME
+  // ------------------------------------------------
+
+  socket.on('start', () => {
+    if (
+      game &&
+      ok()
+    ) {
+      game.start(uid);
+    }
+  });
+
+  // ------------------------------------------------
+  // BACK TO LOBBY
+  // ------------------------------------------------
+
+  socket.on('lobby', () => {
+    if (
+      game &&
+      ok()
+    ) {
+      game.backToLobby(uid);
+    }
+  });
+
+  // ------------------------------------------------
+  // DISCONNECT
+  // ------------------------------------------------
+
+  socket.on(
+    'disconnect',
+    () => {
+      clearInterval(bucket);
+
+      game?.leave(
+        uid,
+        socket.id
+      );
+    }
+  );
 });
 
 // --------------------------------------------------
-// STATIC FRONTEND
+// REMOVE EMPTY ROOMS
 // --------------------------------------------------
 
-app.use(express.static(clientDir));
-
-app.get('/', (req, res) => {
-  res.sendFile(path.join(clientDir, 'index.html'));
-});
+setInterval(() => {
+  for (
+    const [room, game]
+    of rooms
+  ) {
+    if (
+      !game.online.length
+    ) {
+      game.destroy();
+      rooms.delete(room);
+    }
+  }
+}, 30000);
 
 // --------------------------------------------------
-// GAME
+// START WEB SERVER
 // --------------------------------------------------
 
-const game = new Game(io, {
-  announceRecord
-});
+const port =
+  process.env.PORT || 3000;
 
-// --------------------------------------------------
-// SOCKET.IO
-// --------------------------------------------------
-
-io.on('connection', (socket) => {
-  console.log('🔌 Spieler verbunden:', socket.id);
-
-  const ip =
-    socket.handshake.headers['x-forwarded-for']
-      ?.split(',')[0]
-      ?.trim() ||
-    socket.handshake.address ||
-    'unknown';
-
-  socket.on('identify', (data = {}) => {
-    try {
-      const deviceId = String(data.deviceId || '').slice(0, 200);
-
-      const secret =
-        process.env.IP_HASH_SECRET ||
-        'china-chaos-development';
-
-      const guestId = crypto
-        .createHmac('sha256', secret)
-        .update(`${ip}:${deviceId}`)
-        .digest('hex')
-        .slice(0, 24);
-
-      socket.data.guestId = guestId;
-
-      socket.emit('identified', {
-        guestId
-      });
-    } catch (error) {
-      console.error('Identify Fehler:', error);
-    }
-  });
-
-  socket.on('createRoom', (data) => {
-    try {
-      game.createRoom(socket, data);
-    } catch (error) {
-      console.error('createRoom Fehler:', error);
-
-      socket.emit('gameError', {
-        message: 'Lobby konnte nicht erstellt werden.'
-      });
-    }
-  });
-
-  socket.on('joinRoom', (data) => {
-    try {
-      game.joinRoom(socket, data);
-    } catch (error) {
-      console.error('joinRoom Fehler:', error);
-
-      socket.emit('gameError', {
-        message: 'Lobby konnte nicht betreten werden.'
-      });
-    }
-  });
-
-  socket.on('leaveRoom', () => {
-    try {
-      game.leaveRoom(socket);
-    } catch (error) {
-      console.error('leaveRoom Fehler:', error);
-    }
-  });
-
-  socket.on('ready', (data) => {
-    try {
-      game.setReady(socket, data);
-    } catch (error) {
-      console.error('Ready Fehler:', error);
-    }
-  });
-
-  socket.on('difficulty', (data) => {
-    try {
-      game.setDifficulty(socket, data);
-    } catch (error) {
-      console.error('Difficulty Fehler:', error);
-    }
-  });
-
-  socket.on('mode', (data) => {
-    try {
-      game.setMode(socket, data);
-    } catch (error) {
-      console.error('Mode Fehler:', error);
-    }
-  });
-
-  socket.on('teamMode', (data) => {
-    try {
-      game.setTeamMode(socket, data);
-    } catch (error) {
-      console.error('TeamMode Fehler:', error);
-    }
-  });
-
-  socket.on('mapVote', (data) => {
-    try {
-      game.voteMap(socket, data);
-    } catch (error) {
-      console.error('MapVote Fehler:', error);
-    }
-  });
-
-  socket.on('startGame', () => {
-    try {
-      game.start(socket);
-    } catch (error) {
-      console.error('StartGame Fehler:', error);
-
-      socket.emit('gameError', {
-        message: 'Spiel konnte nicht gestartet werden.'
-      });
-    }
-  });
-
-  socket.on('input', (data) => {
-    try {
-      game.input(socket, data);
-    } catch (error) {
-      console.error('Input Fehler:', error);
-    }
-  });
-
-  socket.on('pickup', (data) => {
-    try {
-      game.pickup(socket, data);
-    } catch (error) {
-      console.error('Pickup Fehler:', error);
-    }
-  });
-
-  socket.on('attack', (data) => {
-    try {
-      game.attack(socket, data);
-    } catch (error) {
-      console.error('Attack Fehler:', error);
-    }
-  });
-
-  socket.on('rematch', () => {
-    try {
-      game.rematch(socket);
-    } catch (error) {
-      console.error('Rematch Fehler:', error);
-    }
-  });
-
-  socket.on('disconnect', () => {
-    console.log('❌ Spieler getrennt:', socket.id);
-
-    try {
-      game.disconnect(socket);
-    } catch (error) {
-      console.error('Disconnect Fehler:', error);
-    }
-  });
-});
-
-// --------------------------------------------------
-// SERVER START
-// --------------------------------------------------
-
-const port = process.env.PORT || 3000;
-
-server.listen(port, '0.0.0.0', () => {
-  console.log(`🐉 China Chaos läuft auf Port ${port}`);
-});
+server.listen(
+  port,
+  '0.0.0.0',
+  () => {
+    console.log(
+      `🐉 China Chaos läuft auf Port ${port}`
+    );
+  }
+);
 
 // --------------------------------------------------
 // DISCORD BOT
 // --------------------------------------------------
 
 // Antagonix:
-// RUN_DISCORD_BOT ist nicht "false"
-// -> Bot startet normal.
+// RUN_DISCORD_BOT ist nicht false
+// -> Bot läuft.
 //
 // Render:
 // RUN_DISCORD_BOT=false
-// -> Discord-Bot wird NICHT gestartet.
+// -> nur Web/Game Server.
 
-if (process.env.RUN_DISCORD_BOT !== 'false') {
-  startBot();
-}
-
-// --------------------------------------------------
-// CLEAN SHUTDOWN
-// --------------------------------------------------
-
-function shutdown() {
-  console.log('China Chaos wird beendet...');
-
-  try {
-    closeDb();
-  } catch (error) {
-    console.error('DB Close Fehler:', error);
-  }
-
-  server.close(() => {
-    process.exit(0);
+if (
+  process.env.RUN_DISCORD_BOT !==
+  'false'
+) {
+  startBot().catch(error => {
+    console.error(
+      'Bot:',
+      error.message
+    );
   });
-
-  setTimeout(() => {
-    process.exit(1);
-  }, 5000).unref();
+} else {
+  console.log(
+    '🌐 Render-Modus: Discord Bot deaktiviert'
+  );
 }
 
-process.on('SIGTERM', shutdown);
-process.on('SIGINT', shutdown);
+// --------------------------------------------------
+// SHUTDOWN
+// --------------------------------------------------
+
+const bye = () => {
+  io.close();
+  closeDb();
+  process.exit(0);
+};
+
+process.on(
+  'SIGINT',
+  bye
+);
+
+process.on(
+  'SIGTERM',
+  bye
+);
