@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "build": "vite build client",
     "start": "vite build client && node server/index.js",
