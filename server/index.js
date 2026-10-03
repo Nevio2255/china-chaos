@@ -14,8 +14,8 @@ import { top, records, closeDb } from './db.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Frontend liegt direkt im Ordner /client
-const clientDir = path.join(__dirname, '../client');
+// Vite erstellt das fertige Frontend in client/dist
+const clientDir = path.join(__dirname, '../client/dist');
 
 const app = express();
 const server = http.createServer(app);
@@ -165,8 +165,7 @@ io.on('connection', (socket) => {
 
   socket.on('identify', (data = {}) => {
     try {
-      const deviceId =
-        String(data.deviceId || '').slice(0, 200);
+      const deviceId = String(data.deviceId || '').slice(0, 200);
 
       const secret =
         process.env.IP_HASH_SECRET ||
@@ -331,11 +330,11 @@ server.listen(port, '0.0.0.0', () => {
 
 // Antagonix:
 // RUN_DISCORD_BOT ist nicht "false"
-// -> Discord Bot startet.
+// -> Bot startet normal.
 //
 // Render:
 // RUN_DISCORD_BOT=false
-// -> nur Webserver + Spiel starten.
+// -> Discord-Bot wird NICHT gestartet.
 
 if (process.env.RUN_DISCORD_BOT !== 'false') {
   startBot();
