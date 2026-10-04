@@ -153,6 +153,97 @@
       50% { transform: translateY(-10px) scale(1.03); }
     }
 
+
+    /* =========================================================
+       SOUND-LAUTSTÄRKE
+    ========================================================= */
+    .volumeControl {
+      width: min(430px, calc(100vw - 44px));
+      margin: 10px auto 6px;
+      padding: 14px 18px;
+      box-sizing: border-box;
+      border: 1px solid rgba(244, 197, 66, .22);
+      border-radius: 18px;
+      background: rgba(18, 5, 10, .62);
+      backdrop-filter: blur(12px);
+    }
+
+    .volumeTop {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 10px;
+      font-weight: 900;
+      font-size: 13px;
+      letter-spacing: 1px;
+    }
+
+    #volumeValue {
+      color: #f4c542;
+      min-width: 48px;
+      text-align: right;
+    }
+
+    #volumeSlider {
+      width: 100%;
+      height: 8px;
+      margin: 0;
+      cursor: pointer;
+      accent-color: #f4c542;
+    }
+
+
+    /* =========================================================
+       HINTERGRUNDMUSIK
+    ========================================================= */
+    .musicControl {
+      width: min(430px, calc(100vw - 44px));
+      margin: 10px auto 6px;
+      padding: 14px 18px;
+      box-sizing: border-box;
+      border: 1px solid rgba(244, 197, 66, .22);
+      border-radius: 18px;
+      background: rgba(18, 5, 10, .62);
+      backdrop-filter: blur(12px);
+    }
+
+    .musicTop {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+      font-weight: 900;
+      font-size: 13px;
+      letter-spacing: 1px;
+    }
+
+    .musicTopLeft {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #musicValue {
+      color: #f4c542;
+      min-width: 48px;
+      text-align: right;
+    }
+
+    #musicSlider {
+      width: 100%;
+      height: 8px;
+      margin: 0;
+      cursor: pointer;
+      accent-color: #f4c542;
+    }
+
+    #musicBtn {
+      margin-top: 10px;
+      width: 100%;
+    }
+
   </style>
 </head>
 
@@ -559,6 +650,13 @@
   </div>
 
   <audio
+    id="backgroundMusic"
+    preload="auto"
+    loop
+    src="/assets/audio/background-music.mp3"
+  ></audio>
+
+  <audio
     id="storyAudio"
     preload="auto"
     src="/assets/audio/intro.mp3"
@@ -619,6 +717,49 @@
   >
     🔊 SOUND AN
   </button>
+
+  <div class="volumeControl">
+    <div class="volumeTop">
+      <span>🔉 LAUTSTÄRKE</span>
+      <span id="volumeValue">70%</span>
+    </div>
+
+    <input
+      id="volumeSlider"
+      type="range"
+      min="0"
+      max="100"
+      step="1"
+      value="70"
+      aria-label="Lautstärke"
+    >
+  </div>
+
+  <div class="musicControl">
+    <div class="musicTop">
+      <div class="musicTopLeft">
+        <span>🎵 MUSIK</span>
+      </div>
+      <span id="musicValue">35%</span>
+    </div>
+
+    <input
+      id="musicSlider"
+      type="range"
+      min="0"
+      max="100"
+      step="1"
+      value="35"
+      aria-label="Musiklautstärke"
+    >
+
+    <button
+      class="btn"
+      id="musicBtn"
+    >
+      🎵 MUSIK AN
+    </button>
+  </div>
 
 
   <button
