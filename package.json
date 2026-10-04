@@ -60,6 +60,7 @@
     ],
 
     "asar": true,
+
     "npmRebuild": false,
 
     "publish": [
@@ -80,7 +81,9 @@
           ]
         }
       ],
-      "icon": "desktop/icon.ico",
+
+      "icon": "desktop/build/icon.ico",
+
       "artifactName": "ChinaChaos-Setup-${version}.${ext}"
     },
 
@@ -88,9 +91,12 @@
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
+
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
+
       "shortcutName": "China Chaos",
+
       "deleteAppDataOnUninstall": false
     }
   }
