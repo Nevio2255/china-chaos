@@ -1,0 +1,166 @@
+name: 🐉 China Chaos Windows Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Build China Chaos Windows
+    runs-on: windows-latest
+
+    steps:
+      - name: 📥 Repository laden
+        uses: actions/checkout@v4
+
+      - name: 🟢 Node.js 22 installieren
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: 📦 Dependencies installieren
+        run: npm install --no-audit --no-fund
+
+      - name: 🌐 Web-Version testen
+        run: npm run build
+
+      - name: 🔍 Desktop-Dateien prüfen
+        shell: powershell
+        run: |
+          if (!(Test-Path "desktop/main.cjs")) {
+            Write-Error "desktop/main.cjs fehlt!"
+            exit 1
+          }
+
+          Write-Host "desktop/main.cjs gefunden."
+
+          if (Test-Path "desktop/icon.ico") {
+            Write-Host "China Chaos Icon gefunden."
+          } else {
+            Write-Warning "desktop/icon.ico wurde nicht gefunden."
+          }
+
+      - name: 🐉 Windows Installer bauen
+        shell: powershell
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: |
+          npx electron-builder `
+            --win nsis `
+            --publish never `
+            --config.npmRebuild=false
+
+      - name: 🔎 Build-Dateien anzeigen
+        shell: powershell
+        run: |
+          Write-Host ""
+          Write-Host "========================================"
+          Write-Host "        CHINA CHAOS WINDOWS BUILD"
+          Write-Host "========================================"
+          Write-Host ""
+
+          if (Test-Path "dist-desktop") {
+            Get-ChildItem "dist-desktop" -Recurse
+          } elseif (Test-Path "dist") {
+            Get-ChildItem "dist" -Recurse
+          } else {
+            Write-Error "Kein Build-Ordner gefunden."
+            exit 1
+          }
+
+      - name: 📁 Release-Dateien vorbereiten
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path release-files | Out-Null
+
+          $folders = @(
+            "dist-desktop",
+            "dist"
+          )
+
+          $installerFound = $false
+
+          foreach ($folder in $folders) {
+            if (!(Test-Path $folder)) {
+              continue
+            }
+
+            $installers = Get-ChildItem $folder `
+              -Filter "*.exe" `
+              -File `
+              -Recurse |
+              Where-Object {
+                $_.Name -notmatch "unpacked"
+              }
+
+            foreach ($installer in $installers) {
+              Copy-Item $installer.FullName `
+                -Destination "release-files/$($installer.Name)" `
+                -Force
+
+              Write-Host "EXE gefunden: $($installer.Name)"
+              $installerFound = $true
+            }
+
+            $latest = Get-ChildItem $folder `
+              -Filter "latest.yml" `
+              -File `
+              -Recurse
+
+            foreach ($file in $latest) {
+              Copy-Item $file.FullName `
+                -Destination "release-files/latest.yml" `
+                -Force
+
+              Write-Host "latest.yml gefunden."
+            }
+
+            $blocks = Get-ChildItem $folder `
+              -Filter "*.blockmap" `
+              -File `
+              -Recurse
+
+            foreach ($file in $blocks) {
+              Copy-Item $file.FullName `
+                -Destination "release-files/$($file.Name)" `
+                -Force
+
+              Write-Host "Blockmap gefunden: $($file.Name)"
+            }
+          }
+
+          if (!$installerFound) {
+            Write-Error "Keine Windows Setup EXE gefunden."
+            exit 1
+          }
+
+          Write-Host ""
+          Write-Host "Release-Dateien:"
+          Get-ChildItem release-files
+
+      - name: 📤 Windows Build als Artifact hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: China-Chaos-Windows
+          path: release-files/*
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: 🚀 GitHub Release veröffentlichen
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release-files/*.exe
+            release-files/*.yml
+            release-files/*.blockmap
+          generate_release_notes: true
+          name: China Chaos ${{ github.ref_name }}
+          draft: false
+          prerelease: false
