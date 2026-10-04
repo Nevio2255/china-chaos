@@ -492,6 +492,61 @@
       .ccHero { min-height:300px; }
     }
 
+
+    /* =========================================================
+       CHINA CHAOS V7 — PREMIUM / TACTICAL UI
+    ========================================================= */
+    :root{--v7-cyan:#61e7ff;--v7-pink:#ff4fd8;--v7-orange:#ff9b45;--v7-card:#10101a}
+    .ccSidebar{width:auto;background:linear-gradient(180deg,rgba(6,6,12,.98),rgba(10,5,18,.96))}
+    .ccBrand{font-size:27px;letter-spacing:-1.5px}
+    .ccMain{background:radial-gradient(circle at 85% 0,rgba(128,48,255,.10),transparent 35%)}
+    .ccHero{min-height:390px;border-radius:10px;clip-path:polygon(0 0,100% 0,100% 88%,96% 100%,0 100%);
+      background:linear-gradient(90deg,rgba(7,7,13,.98) 0%,rgba(21,8,38,.93) 55%,rgba(69,15,95,.66) 100%)}
+    .ccHero:before{content:"";position:absolute;inset:0;background:linear-gradient(115deg,transparent 62%,rgba(255,255,255,.035) 62.2%,transparent 62.5%);pointer-events:none}
+    .ccHero h1{font-style:italic;text-transform:uppercase}
+    .ccV7ModeStrip{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+    .ccModeCard{position:relative;overflow:hidden;text-align:left;padding:18px 20px;border-radius:12px;border:1px solid var(--cc-line);color:#fff;cursor:pointer;min-height:105px}
+    .ccModeCard b,.ccModeCard small{display:block}.ccModeCard b{font-size:18px;margin:7px 0}.ccModeCard small{color:#aaa5b6}
+    .ccModeCard.classic{background:linear-gradient(120deg,#15111e,#27122b)}
+    .ccModeCard.battle{background:linear-gradient(120deg,#0c1520,#251037);border-color:rgba(97,231,255,.28)}
+    .ccModeCard:hover{transform:translateY(-2px);box-shadow:0 18px 45px #0007}
+    .ccModeEyebrow,.ccKicker{font-size:10px;letter-spacing:2.2px;color:var(--v7-cyan);font-weight:1000}
+    .ccCardTop{display:flex;justify-content:space-between;gap:10px;font-weight:900;font-size:11px;letter-spacing:1px}
+    .ccCardTop em{font-style:normal;color:var(--v7-cyan)}
+    .ccPassPreview{background:linear-gradient(145deg,#17101e,#241137)}
+    .ccShopPreview{background:linear-gradient(145deg,#10131c,#10202c)}
+    .ccRankPreview{background:linear-gradient(145deg,#17120d,#251d10)}
+    .ccV7Feature{width:min(1320px,calc(100vw - 34px));border-radius:12px;background:linear-gradient(145deg,rgba(7,8,14,.98),rgba(14,8,22,.98))}
+    .ccPassHero,.ccArmoryHero{min-height:290px;padding:34px;display:flex;justify-content:space-between;align-items:center;gap:30px;border:1px solid var(--cc-line);border-radius:12px;background:radial-gradient(circle at 80% 50%,rgba(154,53,255,.35),transparent 25%),linear-gradient(120deg,#0b0c14,#1d0b2d);overflow:hidden}
+    .ccPassHero h1,.ccArmoryHero h1{font-size:clamp(42px,6vw,82px);line-height:.86;margin:10px 0;letter-spacing:-4px;font-style:italic}
+    .ccPassHero h1 span{color:var(--cc-purple)}
+    .ccPassLevel{width:230px;padding:24px;border:1px solid rgba(255,255,255,.12);background:#080911cc;text-align:center}
+    .ccPassLevel strong{display:block;font-size:72px;color:var(--cc-gold)}
+    .ccPassTracks{margin-top:18px}.ccTrackLabel{display:flex;justify-content:space-between;margin:16px 0 8px}.ccTrackLabel.premium b{color:var(--cc-gold)}
+    .ccRewardTrack{display:grid;grid-template-columns:repeat(6,minmax(130px,1fr));gap:9px;overflow-x:auto;padding-bottom:7px}
+    .ccReward{min-height:145px;padding:14px;border:1px solid var(--cc-line);background:#0d0e17;position:relative;text-align:center}
+    .ccReward.unlocked{border-color:rgba(85,230,155,.5);box-shadow:inset 0 0 30px rgba(85,230,155,.05)}
+    .ccReward .lvl{position:absolute;top:8px;left:9px;font-size:10px;color:#827d91}.ccReward .icon{font-size:38px;margin:25px 0 9px}.ccReward b{display:block;font-size:12px}.ccReward small{color:#817c8d}
+    .ccReward button{margin-top:8px;border:0;padding:6px 9px;background:#6524c8;color:#fff;font-weight:900;cursor:pointer}
+    .ccShopHeadRight{display:flex;gap:10px;align-items:center}
+    .ccShopHero{min-height:210px;padding:28px 36px;display:flex;align-items:center;justify-content:space-between;border:1px solid rgba(255,79,216,.22);background:linear-gradient(110deg,#12101d,#29103c);overflow:hidden}
+    .ccShopHero h1{font-size:clamp(38px,5vw,68px);margin:8px 0}.ccShopDragon{font-size:130px;filter:drop-shadow(0 0 35px #9a35ff88)}
+    .ccShopTabs{display:flex;gap:8px;margin:18px 0;flex-wrap:wrap}.ccShopTab{padding:9px 15px;background:#10111a;color:#aaa5b6;border:1px solid #282538;cursor:pointer;font-weight:900}.ccShopTab.active{color:#fff;border-color:#8d3cff;background:#26123d}
+    .ccShopGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+    .ccShopItem{min-height:230px;border:1px solid #2b2738;background:linear-gradient(155deg,#11121b,#0b0c12);padding:16px;position:relative;overflow:hidden}
+    .ccShopItem .rarity{font-size:9px;letter-spacing:2px;font-weight:1000}.ccShopItem .art{height:100px;display:grid;place-items:center;font-size:66px}.ccShopItem h3{margin:5px 0}.ccShopItem p{font-size:12px;color:#888392;min-height:35px}.ccShopItem button{width:100%;padding:9px;border:0;background:#6f2be2;color:#fff;font-weight:1000;cursor:pointer}.ccShopItem button.owned{background:#20222c;color:#6be3a3}
+    .ccShopItem.legendary{border-color:#f4c54266}.ccShopItem.epic{border-color:#9a35ff66}.ccShopItem.rare{border-color:#61e7ff55}
+    .ccArmoryHero{background:radial-gradient(circle at 78% 50%,rgba(97,231,255,.14),transparent 20%),linear-gradient(120deg,#080c13,#151126)}
+    .ccRankOrb{width:190px;height:190px;border-radius:50%;display:grid;place-items:center;align-content:center;border:1px solid #61e7ff55;box-shadow:0 0 55px #61e7ff16;background:#0b111bcc}.ccRankOrb span,.ccRankOrb small{color:#7d8793}.ccRankOrb b{font-size:28px;color:var(--v7-cyan);margin:5px}
+    .ccWeaponClassGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px}.ccWeaponClass{padding:18px;border:1px solid #2a2a39;background:#0e0f17}.ccWeaponClass span{font-size:9px;color:var(--v7-cyan);letter-spacing:2px}.ccWeaponClass b,.ccWeaponClass small{display:block}.ccWeaponClass b{margin:7px 0}.ccWeaponClass small{color:#85818e}
+    body.battle #battleHud{display:block!important}.ccBattleTop{position:fixed;top:12px;left:50%;transform:translateX(-50%);display:flex;align-items:stretch;z-index:30;filter:drop-shadow(0 8px 20px #000)}
+    .ccBattleTeam,.ccBattleRound{background:#0b0d13e8;border:1px solid #ffffff14;padding:8px 16px}.ccBattleTeam{font:900 12px sans-serif;min-width:95px}.ccBattleTeam b{font-size:20px;margin:0 6px}.ccBattleTeam.red{border-left:3px solid #ff4f68}.ccBattleTeam.blue{border-right:3px solid #52b7ff}.ccBattleRound{text-align:center;min-width:230px}.ccBattleRound span,.ccBattleRound small{display:block}.ccBattleRound span{font:1000 11px sans-serif;letter-spacing:2px}.ccBattleRound small{font:700 8px sans-serif;color:#777f8c;margin-top:3px}
+    .ccKillFeed{position:fixed;right:18px;top:80px;width:280px;z-index:30}.ccKillLine{margin-bottom:5px;padding:7px 10px;background:#090b11dd;border-right:2px solid var(--v7-cyan);font:800 11px sans-serif;text-align:right;animation:killIn .18s ease}.ccKillLine b{color:var(--v7-cyan)}
+    .ccCrosshair{position:fixed;left:50%;top:50%;width:28px;height:28px;transform:translate(-50%,-50%);z-index:25;pointer-events:none}.ccCrosshair i{position:absolute;background:#fff;box-shadow:0 0 3px #000}.ccCrosshair i:nth-child(1){width:7px;height:2px;left:0;top:13px}.ccCrosshair i:nth-child(2){width:7px;height:2px;right:0;top:13px}.ccCrosshair i:nth-child(3){width:2px;height:7px;top:0;left:13px}.ccCrosshair i:nth-child(4){width:2px;height:7px;bottom:0;left:13px}
+    @keyframes killIn{from{transform:translateX(20px);opacity:0}to{transform:none;opacity:1}}
+    @media(max-width:1050px){.ccShopGrid{grid-template-columns:repeat(2,1fr)}.ccWeaponClassGrid{grid-template-columns:repeat(2,1fr)}.ccV7ModeStrip{grid-template-columns:1fr}.ccPassHero,.ccArmoryHero{align-items:flex-start;flex-direction:column}.ccPassLevel{width:100%}}
+    @media(max-width:620px){.ccShopGrid{grid-template-columns:1fr}.ccRewardTrack{grid-template-columns:repeat(6,140px)}.ccShopDragon{font-size:80px}.ccWeaponClassGrid{grid-template-columns:1fr}.ccBattleTop{display:none}}
+
   </style>
 </head>
 
@@ -934,6 +989,8 @@
 
       <button class="ccNavBtn active" id="playBtn">🎮 Spielen</button>
       <button class="ccNavBtn" id="battleQuickBtn">⚔️ Battle Modus</button>
+      <button class="ccNavBtn" data-go="battlepass">🎫 Battle Pass</button>
+      <button class="ccNavBtn" data-go="shop">🛒 Shop</button>
       <button class="ccNavBtn" data-go="friends">👥 Freunde</button>
       <button class="ccNavBtn" data-go="clan">🐉 Clan / Crew</button>
       <button class="ccNavBtn" data-go="quests">📜 Quests</button>
@@ -966,6 +1023,41 @@
         <div class="ccHeroActions">
           <button class="ccPrimary" id="heroPlayBtn">▶ JETZT SPIELEN</button>
           <button class="ccSecondary" id="heroBattleBtn">⚔️ BATTLE STARTEN</button>
+        </div>
+      </div>
+
+      <div class="ccV7ModeStrip">
+        <button class="ccModeCard classic" id="v7ClassicCard">
+          <span class="ccModeEyebrow">ORIGINAL MODE</span>
+          <b>🐉 CLASSIC CHAOS</b>
+          <small>90 Sekunden · Combos · Power-ups · Dragon Events</small>
+        </button>
+        <button class="ccModeCard battle" id="v7BattleCard">
+          <span class="ccModeEyebrow">TACTICAL PVP</span>
+          <b>⚔️ BATTLE PROTOCOL</b>
+          <small>FFA / Teams · Loadouts · Respawn · Waffen-Raritäten</small>
+        </button>
+      </div>
+
+      <div class="ccGrid ccV7HomeGrid">
+        <div class="ccCard ccPassPreview">
+          <div class="ccCardTop"><span>🎫 BATTLE PASS</span><em>SEASON 1</em></div>
+          <h3>DRAGON PROTOCOL</h3>
+          <p>Steige auf, schalte Coins, Titel und exklusive Cosmetics frei.</p>
+          <div class="ccProgress"><i id="passPreviewBar" style="width:10%"></i></div>
+          <button class="ccSecondary" data-go="battlepass" style="margin-top:12px">PASS ÖFFNEN</button>
+        </div>
+        <div class="ccCard ccShopPreview">
+          <div class="ccCardTop"><span>🛒 SHOP</span><em>NEU</em></div>
+          <h3>NIGHT MARKET</h3>
+          <p>Skins, Karten, Titel und Effekte – bezahlt mit deinen erspielten Coins.</p>
+          <button class="ccSecondary" data-go="shop" style="margin-top:12px">SHOP ÖFFNEN</button>
+        </div>
+        <div class="ccCard ccRankPreview">
+          <div class="ccCardTop"><span>⚔️ BATTLE RANK</span><em>LIVE</em></div>
+          <h3 id="battleRankName">JADE I</h3>
+          <p><span id="battleRankPoints">0</span> RP · K/D <strong id="battleKdPreview">0.00</strong></p>
+          <div class="ccProgress"><i id="battleRankBar" style="width:0%"></i></div>
         </div>
       </div>
 
@@ -1067,6 +1159,88 @@
   </div>
 </section>
 
+
+
+<!-- =========================================================
+     V7 BATTLE PASS
+========================================================= -->
+<section id="battlepass" class="screen">
+  <div class="ccFeatureScreen ccV7Feature">
+    <div class="ccFeatureHead">
+      <div><span class="ccKicker">SEASON 1</span><h2>🎫 DRAGON PROTOCOL · BATTLE PASS</h2></div>
+      <button class="btn" data-go="start">← HAUPTMENÜ</button>
+    </div>
+    <div class="ccPassHero">
+      <div>
+        <span class="ccKicker">NOCH 41 TAGE</span>
+        <h1>DRAGON<br><span>PROTOCOL</span></h1>
+        <p>Spiele Classic und Battle, sammle XP und schalte Belohnungen frei.</p>
+      </div>
+      <div class="ccPassLevel">
+        <small>PASS LEVEL</small><strong id="passLevelBig">1</strong>
+        <div class="ccProgress"><i id="passBarBig" style="width:0%"></i></div>
+        <span id="passXpText">0 / 500 XP</span>
+      </div>
+    </div>
+    <div class="ccPassTracks">
+      <div class="ccTrackLabel"><b>FREE</b><small>Für alle Spieler</small></div>
+      <div id="freePassTrack" class="ccRewardTrack"></div>
+      <div class="ccTrackLabel premium"><b>ELITE</b><small>Dragon Elite Track · Vorschau</small></div>
+      <div id="elitePassTrack" class="ccRewardTrack"></div>
+    </div>
+  </div>
+</section>
+
+<!-- =========================================================
+     V7 SHOP
+========================================================= -->
+<section id="shop" class="screen">
+  <div class="ccFeatureScreen ccV7Feature">
+    <div class="ccFeatureHead">
+      <div><span class="ccKicker">NIGHT MARKET</span><h2>🛒 CHINA CHAOS SHOP</h2></div>
+      <div class="ccShopHeadRight"><span class="ccPill">🪙 <span id="shopCoins">0</span></span><button class="btn" data-go="start">← HAUPTMENÜ</button></div>
+    </div>
+    <div class="ccShopHero">
+      <div><span class="ccKicker">FEATURED · 24H</span><h1>VOID DRAGON</h1><p>Animierter Legendary-Look für dein Battle-Profil.</p></div>
+      <div class="ccShopDragon">🐉</div>
+    </div>
+    <div class="ccShopTabs">
+      <button class="ccShopTab active" data-shop-filter="all">ALLE</button>
+      <button class="ccShopTab" data-shop-filter="skin">SKINS</button>
+      <button class="ccShopTab" data-shop-filter="card">PLAYER CARDS</button>
+      <button class="ccShopTab" data-shop-filter="title">TITEL</button>
+      <button class="ccShopTab" data-shop-filter="effect">EFFEKTE</button>
+    </div>
+    <div id="shopGrid" class="ccShopGrid"></div>
+  </div>
+</section>
+
+<!-- =========================================================
+     V7 BATTLE ARMORY
+========================================================= -->
+<section id="armory" class="screen">
+  <div class="ccFeatureScreen ccV7Feature">
+    <div class="ccFeatureHead">
+      <div><span class="ccKicker">BATTLE PROTOCOL</span><h2>⚔️ ARMORY & LOADOUT</h2></div>
+      <button class="btn" data-go="start">← HAUPTMENÜ</button>
+    </div>
+    <div class="ccArmoryHero">
+      <div>
+        <span class="ccKicker">TACTICAL COMBAT</span>
+        <h1>DEIN LOADOUT.<br>DEIN CHAOS.</h1>
+        <p>Waffen werden im Match gesammelt. Hier siehst du Klassen, Seltenheiten und deinen Battle-Fortschritt.</p>
+        <button class="ccPrimary" id="armoryBattleBtn">BATTLE STARTEN</button>
+      </div>
+      <div class="ccRankOrb"><span>RANK</span><b id="armoryRank">JADE I</b><small id="armoryRp">0 RP</small></div>
+    </div>
+    <div class="ccWeaponClassGrid">
+      <div class="ccWeaponClass"><span>PISTOL</span><b>Jade Sidearm</b><small>Mobil · präzise · schneller Wechsel</small></div>
+      <div class="ccWeaponClass"><span>RIFLE</span><b>Dragon Repeater</b><small>Allround · mittlere Distanz</small></div>
+      <div class="ccWeaponClass"><span>HEAVY</span><b>Panda Cannon</b><small>Langsam · hoher Schaden</small></div>
+      <div class="ccWeaponClass"><span>SPECIAL</span><b>Firecracker</b><small>Chaos-Projektil · selten</small></div>
+    </div>
+  </div>
+</section>
 
 <!-- =========================================================
      GRUPPEN
@@ -1441,6 +1615,13 @@
 
 
   <div id="battleHud">
+    <div class="ccBattleTop">
+      <div class="ccBattleTeam red">RED <b id="battleRedScore">0</b></div>
+      <div class="ccBattleRound"><span>BATTLE PROTOCOL</span><small>ELIMINATE · SURVIVE · DOMINATE</small></div>
+      <div class="ccBattleTeam blue"><b id="battleBlueScore">0</b> BLUE</div>
+    </div>
+    <div id="killFeed" class="ccKillFeed"></div>
+    <div id="crosshair" class="ccCrosshair"><i></i><i></i><i></i><i></i></div>
 
     <div id="weaponHud"></div>
 

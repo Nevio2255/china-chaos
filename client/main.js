@@ -843,7 +843,97 @@ function loadProgress() {
   }
 }
 
+
 let progress = loadProgress();
+progress.inventory = Array.isArray(progress.inventory) ? progress.inventory : [];
+progress.passClaims = Array.isArray(progress.passClaims) ? progress.passClaims : [];
+progress.equipped = progress.equipped || {};
+progress.battleRp = Number(progress.battleRp || 0);
+
+const V7_SHOP = [
+  {id:'void-dragon',type:'skin',rarity:'legendary',icon:'🐉',name:'Void Dragon',desc:'Legendary Battle-Profilskin',price:2400},
+  {id:'jade-agent',type:'skin',rarity:'epic',icon:'🥷',name:'Jade Agent',desc:'Taktischer Jade-Look',price:1500},
+  {id:'neon-card',type:'card',rarity:'epic',icon:'🌃',name:'Neon Shanghai',desc:'Animierte Player Card',price:1200},
+  {id:'temple-card',type:'card',rarity:'rare',icon:'🏯',name:'Dragon Temple',desc:'Temple Player Card',price:700},
+  {id:'dragon-title',type:'title',rarity:'rare',icon:'👑',name:'Dragon Hunter',desc:'Exklusiver Profil-Titel',price:850},
+  {id:'chaos-title',type:'title',rarity:'legendary',icon:'⚡',name:'Chaos Protocol',desc:'Legendärer Battle-Titel',price:2200},
+  {id:'kill-effect',type:'effect',rarity:'epic',icon:'💥',name:'Firecracker KO',desc:'KO-Effekt für Battle',price:1350},
+  {id:'jade-effect',type:'effect',rarity:'rare',icon:'💚',name:'Jade Pulse',desc:'Jade Treffer-Effekt',price:650}
+];
+
+const V7_PASS = [
+  {lvl:1,icon:'🪙',name:'100 Coins',coins:100},
+  {lvl:2,icon:'🎴',name:'Red Lantern Card'},
+  {lvl:3,icon:'🪙',name:'200 Coins',coins:200},
+  {lvl:4,icon:'💥',name:'Firecracker FX'},
+  {lvl:5,icon:'👑',name:'Dragon Rising'},
+  {lvl:6,icon:'🐉',name:'Neon Dragon'}
+];
+
+function v7Rank(){
+  const rp = Math.max(0, progress.battleRp || 0);
+  const ranks = ['JADE I','JADE II','JADE III','DRAGON I','DRAGON II','DRAGON III','CELESTIAL'];
+  const idx = Math.min(ranks.length-1, Math.floor(rp/500));
+  return {name:ranks[idx],rp,next:idx===ranks.length-1?rp%500:rp%500,pct:idx===ranks.length-1?100:(rp%500)/5};
+}
+function renderV7(){
+  const lvl = Math.max(1, Math.floor((progress.xp||0)/500)+1);
+  const xpIn = (progress.xp||0)%500;
+  const rank=v7Rank();
+  if($('#passLevelBig')) $('#passLevelBig').textContent=lvl;
+  if($('#passXpText')) $('#passXpText').textContent=`${xpIn} / 500 XP`;
+  if($('#passBarBig')) $('#passBarBig').style.width=`${xpIn/5}%`;
+  if($('#passPreviewBar')) $('#passPreviewBar').style.width=`${xpIn/5}%`;
+  if($('#shopCoins')) $('#shopCoins').textContent=progress.coins||0;
+  if($('#battleRankName')) $('#battleRankName').textContent=rank.name;
+  if($('#battleRankPoints')) $('#battleRankPoints').textContent=rank.rp;
+  if($('#battleRankBar')) $('#battleRankBar').style.width=`${rank.pct}%`;
+  if($('#armoryRank')) $('#armoryRank').textContent=rank.name;
+  if($('#armoryRp')) $('#armoryRp').textContent=`${rank.rp} RP`;
+  const kd=progress.deaths?(progress.battleKills/progress.deaths).toFixed(2):(progress.battleKills||0).toFixed(2);
+  if($('#battleKdPreview')) $('#battleKdPreview').textContent=kd;
+
+  const free=$('#freePassTrack');
+  if(free) free.innerHTML=V7_PASS.map(r=>{
+    const unlocked=lvl>=r.lvl, claimed=progress.passClaims.includes(r.lvl);
+    return `<div class="ccReward ${unlocked?'unlocked':''}"><span class="lvl">LV ${r.lvl}</span><div class="icon">${r.icon}</div><b>${r.name}</b><small>${claimed?'ABGEHOLT':unlocked?'FREIGESCHALTET':'GESPERRT'}</small>${unlocked&&!claimed?`<button data-pass-claim="${r.lvl}">ABHOLEN</button>`:''}</div>`;
+  }).join('');
+  const elite=$('#elitePassTrack');
+  if(elite) elite.innerHTML=V7_PASS.map((r,i)=>`<div class="ccReward"><span class="lvl">LV ${r.lvl}</span><div class="icon">${['🔮','🐲','💎','🌌','⚔️','👑'][i]}</div><b>${['Void Spray','Dragon Crest','250 Coins','Night Card','Jade Weapon Wrap','Celestial Dragon'][i]}</b><small>ELITE TRACK</small></div>`).join('');
+
+  renderShop('all');
+}
+function renderShop(filter='all'){
+  const grid=$('#shopGrid'); if(!grid)return;
+  grid.innerHTML=V7_SHOP.filter(x=>filter==='all'||x.type===filter).map(x=>{
+    const owned=progress.inventory.includes(x.id);
+    return `<article class="ccShopItem ${x.rarity}"><span class="rarity">${x.rarity.toUpperCase()}</span><div class="art">${x.icon}</div><h3>${x.name}</h3><p>${x.desc}</p><button data-buy="${x.id}" class="${owned?'owned':''}">${owned?'✓ IM BESITZ':`🪙 ${x.price}`}</button></article>`;
+  }).join('');
+}
+document.addEventListener('click',e=>{
+  const claim=e.target.closest('[data-pass-claim]');
+  if(claim){
+    const lvl=Number(claim.dataset.passClaim), reward=V7_PASS.find(x=>x.lvl===lvl);
+    if(!reward||progress.passClaims.includes(lvl))return;
+    progress.passClaims.push(lvl); if(reward.coins)progress.coins+=reward.coins;
+    saveProgress(); renderV6Progress(); renderV7(); sfx.power(); toast(`${reward.name} freigeschaltet!`); return;
+  }
+  const buy=e.target.closest('[data-buy]');
+  if(buy){
+    const item=V7_SHOP.find(x=>x.id===buy.dataset.buy); if(!item)return;
+    if(progress.inventory.includes(item.id)){toast('Bereits im Besitz.');return;}
+    if((progress.coins||0)<item.price){toast('Nicht genug Coins.');return;}
+    progress.coins-=item.price; progress.inventory.push(item.id); saveProgress(); renderV6Progress(); renderV7(); sfx.power(); toast(`${item.name} gekauft!`); return;
+  }
+  const tab=e.target.closest('[data-shop-filter]');
+  if(tab){
+    document.querySelectorAll('.ccShopTab').forEach(x=>x.classList.remove('active'));tab.classList.add('active');renderShop(tab.dataset.shopFilter);return;
+  }
+});
+$('#v7ClassicCard')?.addEventListener('click',()=>openPlay(false));
+$('#v7BattleCard')?.addEventListener('click',()=>openPlay(true));
+$('#armoryBattleBtn')?.addEventListener('click',()=>openPlay(true));
+
 
 function saveProgress() {
   localStorage.setItem(CC_PROGRESS_KEY, JSON.stringify(progress));
@@ -931,6 +1021,7 @@ $('#heroBattleBtn')?.addEventListener('click',()=>openPlay(true));
 $('#battleQuickBtn')?.addEventListener('click',()=>openPlay(true));
 
 renderV6Progress();
+renderV7();
 
 
 /* =========================================================
@@ -1746,6 +1837,9 @@ function sync() {
         ];
 
 
+      if ($('#battleRedScore')) $('#battleRedScore').textContent = S.teamScores?.red || 0;
+      if ($('#battleBlueScore')) $('#battleBlueScore').textContent = S.teamScores?.blue || 0;
+
       $('#weaponHud').innerHTML =
         `⚔️ ${
           g
@@ -2040,6 +2134,19 @@ function sync() {
       oldMe.kills
     ) {
       sfx.kill();
+      const gained = Math.max(1, me.kills - oldMe.kills);
+      progress.battleRp = (progress.battleRp || 0) + gained * 25;
+      progress.battleKills = (progress.battleKills || 0) + gained;
+      saveProgress();
+      renderV7();
+      const feed = $('#killFeed');
+      if (feed) {
+        const line = document.createElement('div');
+        line.className = 'ccKillLine';
+        line.innerHTML = `<b>YOU</b> ⚔️ ELIMINATION <span>+25 RP</span>`;
+        feed.prepend(line);
+        setTimeout(()=>line.remove(), 3500);
+      }
     }
 
     const op =
