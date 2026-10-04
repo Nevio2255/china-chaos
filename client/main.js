@@ -14,6 +14,55 @@ let room;
 let screen = 'loading';
 
 let sound = localStorage.getItem('ccSound') !== 'off';
+
+let volume = Number(
+  localStorage.getItem('ccVolume') ?? 70
+);
+
+if (
+  !Number.isFinite(volume)
+) {
+  volume = 70;
+}
+
+volume = Math.max(
+  0,
+  Math.min(
+    100,
+    volume
+  )
+);
+
+let musicOn =
+  localStorage.getItem(
+    'ccMusic'
+  ) !== 'off';
+
+let musicVolume = Number(
+  localStorage.getItem(
+    'ccMusicVolume'
+  ) ?? 35
+);
+
+if (
+  !Number.isFinite(
+    musicVolume
+  )
+) {
+  musicVolume = 35;
+}
+
+musicVolume = Math.max(
+  0,
+  Math.min(
+    100,
+    musicVolume
+  )
+);
+
+let musicStarted = false;
+let storyDucking = false;
+
 let meProfile = null;
 let skin = 'discord';
 
@@ -93,7 +142,9 @@ function beep(
     );
 
     g.gain.setValueAtTime(
-      vol,
+      vol * (
+        volume / 100
+      ),
       at
     );
 
@@ -362,6 +413,194 @@ const sfx = {
 
 
 /* =========================================================
+   HINTERGRUNDMUSIK
+========================================================= */
+
+function musicTargetVolume() {
+  if (!musicOn) {
+    return 0;
+  }
+
+  const base =
+    musicVolume / 100;
+
+  /*
+    Während der Geschichte wird die Musik
+    automatisch leiser, damit man die Stimme
+    gut versteht.
+  */
+  return storyDucking
+    ? base * 0.28
+    : base;
+}
+
+function applyMusicVolume() {
+  const audio =
+    $('#backgroundMusic');
+
+  if (audio) {
+    audio.volume =
+      Math.max(
+        0,
+        Math.min(
+          1,
+          musicTargetVolume()
+        )
+      );
+  }
+
+  const slider =
+    $('#musicSlider');
+
+  const value =
+    $('#musicValue');
+
+  const button =
+    $('#musicBtn');
+
+  if (slider) {
+    slider.value =
+      String(musicVolume);
+  }
+
+  if (value) {
+    value.textContent =
+      `${musicVolume}%`;
+  }
+
+  if (button) {
+    button.textContent =
+      musicOn
+        ? '🎵 MUSIK AN'
+        : '🔇 MUSIK AUS';
+  }
+}
+
+async function startBackgroundMusic() {
+  const audio =
+    $('#backgroundMusic');
+
+  if (
+    !audio ||
+    !musicOn
+  ) {
+    applyMusicVolume();
+    return;
+  }
+
+  applyMusicVolume();
+
+  try {
+    await audio.play();
+    musicStarted = true;
+  } catch {
+    /*
+      Browser dürfen Musik oft erst nach dem
+      ersten Klick / Tastendruck starten.
+      unlockBackgroundMusic übernimmt das.
+    */
+  }
+}
+
+function unlockBackgroundMusic() {
+  if (
+    musicOn &&
+    !musicStarted
+  ) {
+    startBackgroundMusic();
+  }
+}
+
+applyMusicVolume();
+
+/*
+  Versuche direkt zu starten. Falls Autoplay
+  blockiert wird, startet sie beim ersten Klick,
+  Touch oder Tastendruck.
+*/
+startBackgroundMusic();
+
+[
+  'pointerdown',
+  'touchstart',
+  'keydown'
+].forEach(
+  eventName => {
+    document.addEventListener(
+      eventName,
+      unlockBackgroundMusic,
+      {
+        once: false,
+        passive: true
+      }
+    );
+  }
+);
+
+$('#musicSlider')
+  ?.addEventListener(
+    'input',
+    e => {
+      musicVolume =
+        Math.max(
+          0,
+          Math.min(
+            100,
+            Number(
+              e.target.value
+            ) || 0
+          )
+        );
+
+      localStorage.setItem(
+        'ccMusicVolume',
+        String(musicVolume)
+      );
+
+      if (
+        musicVolume > 0 &&
+        !musicOn
+      ) {
+        musicOn = true;
+
+        localStorage.setItem(
+          'ccMusic',
+          'on'
+        );
+      }
+
+      applyMusicVolume();
+      startBackgroundMusic();
+    }
+  );
+
+$('#musicBtn').onclick =
+  () => {
+    musicOn =
+      !musicOn;
+
+    localStorage.setItem(
+      'ccMusic',
+      musicOn
+        ? 'on'
+        : 'off'
+    );
+
+    const audio =
+      $('#backgroundMusic');
+
+    if (musicOn) {
+      startBackgroundMusic();
+    } else if (audio) {
+      audio.pause();
+      musicStarted = false;
+    }
+
+    applyMusicVolume();
+  };
+
+
+/* =========================================================
    STORY INTRO
 ========================================================= */
 
@@ -410,6 +649,10 @@ function finishStory(markSeen = true) {
   }
 
   storyRunning = false;
+  storyDucking = false;
+
+  applyMusicVolume();
+  startBackgroundMusic();
 
   stopStoryAudio();
 
@@ -482,7 +725,7 @@ async function startStoryAudio() {
 
   audio.volume =
     sound
-      ? 1
+      ? volume / 100
       : 0;
 
   try {
@@ -510,6 +753,10 @@ async function playStory(
 ) {
   storyReplay = replay;
   storyRunning = true;
+  storyDucking = true;
+
+  applyMusicVolume();
+  startBackgroundMusic();
 
   show('storyIntro');
 
@@ -798,6 +1045,86 @@ $('#soundBtn').textContent =
     ? '🔊 SOUND AN'
     : '🔇 SOUND AUS';
 
+const volumeSlider =
+  $('#volumeSlider');
+
+const volumeValue =
+  $('#volumeValue');
+
+function applyVolume() {
+  if (volumeSlider) {
+    volumeSlider.value =
+      String(volume);
+  }
+
+  if (volumeValue) {
+    volumeValue.textContent =
+      `${volume}%`;
+  }
+
+  const storyAudio =
+    $('#storyAudio');
+
+  if (storyAudio) {
+    storyAudio.volume =
+      sound
+        ? volume / 100
+        : 0;
+  }
+}
+
+applyVolume();
+
+volumeSlider?.addEventListener(
+  'input',
+  e => {
+    volume =
+      Math.max(
+        0,
+        Math.min(
+          100,
+          Number(
+            e.target.value
+          ) || 0
+        )
+      );
+
+    localStorage.setItem(
+      'ccVolume',
+      String(volume)
+    );
+
+    if (
+      volume > 0 &&
+      !sound
+    ) {
+      sound = true;
+
+      localStorage.setItem(
+        'ccSound',
+        'on'
+      );
+
+      $('#soundBtn').textContent =
+        '🔊 SOUND AN';
+    }
+
+    applyVolume();
+  }
+);
+
+volumeSlider?.addEventListener(
+  'change',
+  () => {
+    if (
+      sound &&
+      volume > 0
+    ) {
+      sfx.click();
+    }
+  }
+);
+
 $('#soundBtn').onclick =
   () => {
 
@@ -816,21 +1143,12 @@ $('#soundBtn').onclick =
         ? '🔊 SOUND AN'
         : '🔇 SOUND AUS';
 
-    const storyAudio =
-      $('#storyAudio');
-
-    if (storyAudio) {
-      storyAudio.volume =
-        sound
-          ? 1
-          : 0;
-    }
+    applyVolume();
 
     if (sound) {
       sfx.power();
     }
   };
-
 
 document.addEventListener(
   'click',
