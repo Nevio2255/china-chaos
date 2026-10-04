@@ -21,27 +21,48 @@ jobs:
           node-version: "22"
           cache: "npm"
 
-      - name: 📦 Dependencies installieren
+      - name: 📦 Projekt installieren
         run: npm ci
 
       - name: 🌐 Web-Version bauen
         run: npm run build
 
-      - name: 📦 Electron Builder installieren
-        run: npm install --save-dev electron electron-builder
+      - name: 🖥️ Desktop Builder installieren
+        run: |
+          npm install --no-save electron@35 electron-builder@26
 
-      - name: 🐉 China Chaos EXE bauen
-        run: npx electron-builder --win nsis
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: "false"
-
-      - name: 🔎 Build-Dateien anzeigen
+      - name: 🗑️ Server SQLite aus Desktop-Build entfernen
         shell: powershell
         run: |
-          Write-Host "=== Windows Build ==="
-          Get-ChildItem -Path dist-desktop -Recurse -ErrorAction SilentlyContinue
+          if (Test-Path "node_modules/better-sqlite3") {
+            Remove-Item "node_modules/better-sqlite3" -Recurse -Force
+          }
 
-      - name: 📤 Windows-Version hochladen
+          Write-Host "better-sqlite3 wurde aus dem Desktop-Paket entfernt."
+
+      - name: 🐉 Windows Installer bauen
+        shell: powershell
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: |
+          npx electron-builder `
+            --win nsis `
+            --publish never `
+            -c.npmRebuild=false
+
+      - name: 🔎 Ergebnis anzeigen
+        shell: powershell
+        run: |
+          Write-Host "===== CHINA CHAOS WINDOWS BUILD ====="
+
+          if (Test-Path "dist-desktop") {
+            Get-ChildItem "dist-desktop" -Recurse
+          } else {
+            Write-Error "dist-desktop wurde nicht erstellt."
+            exit 1
+          }
+
+      - name: 📤 China Chaos Windows hochladen
         uses: actions/upload-artifact@v4
         with:
           name: China-Chaos-Windows
