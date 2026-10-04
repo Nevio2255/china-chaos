@@ -360,6 +360,216 @@ const sfx = {
 };
 
 
+
+/* =========================================================
+   STORY INTRO
+========================================================= */
+
+const STORY_SEEN_KEY = 'ccStoryIntroSeenV1';
+
+const storyLines = [
+  'Willkommen bei China Chaos!',
+  'Doch bevor es losgeht, gibt es eine kleine Geschichte darüber, wie dieses Spiel überhaupt entstanden ist.',
+  'Der Gründer von China Chaos ist Zyro – mit echtem Namen Nevio.',
+  'Eines Tages war Nevio in einem Call und spielte Valorant.',
+  'Karina war ebenfalls im Call, allerdings stummgeschaltet und am Schlafen.',
+  'Wegen Nevio wurde Karina plötzlich wach und hat sich dabei ziemlich erschrocken.',
+  'Dadurch kamen Nevio und Karina ein bisschen ins Gespräch.',
+  'Irgendwann fand Nevio heraus, dass Karina aus der Nähe von China kommt.',
+  'Und von diesem Moment an gab Nevio ihr einen neuen Spitznamen: Die Chinesin.',
+  'Und genau daraus entstand irgendwann die Idee für dieses Spiel.',
+  'Nevio hat sich die Mühe gemacht, China Chaos für Karina zu entwickeln und aus dieser kleinen Geschichte ein eigenes Game zu machen.',
+  'Wir hoffen, dass ihr viel Spaß habt und euch das Spiel gefällt.',
+  'Und natürlich dreht sich dieses Game um ein ganz bestimmtes Thema …',
+  'CHINA!',
+  'Willkommen bei China Chaos.',
+  'Viel Spaß … und möge das Chaos beginnen!'
+];
+
+let storyRunning = false;
+let storyReplay = false;
+
+function stopStoryAudio() {
+  const audio = $('#storyAudio');
+
+  if (!audio) return;
+
+  audio.pause();
+
+  try {
+    audio.currentTime = 0;
+  } catch {}
+}
+
+function finishStory(markSeen = true) {
+  if (markSeen) {
+    localStorage.setItem(
+      STORY_SEEN_KEY,
+      '1'
+    );
+  }
+
+  storyRunning = false;
+
+  stopStoryAudio();
+
+  $('#storyIntro')
+    ?.classList
+    .remove('waiting');
+
+  $('#storyProgressFill').style.width =
+    '0%';
+
+  show('start');
+}
+
+function syncStorySubtitle() {
+  const audio = $('#storyAudio');
+
+  if (
+    !audio ||
+    !storyRunning
+  ) {
+    return;
+  }
+
+  const duration =
+    Number.isFinite(audio.duration) &&
+    audio.duration > 0
+      ? audio.duration
+      : 1;
+
+  const progress =
+    Math.max(
+      0,
+      Math.min(
+        1,
+        audio.currentTime / duration
+      )
+    );
+
+  const index =
+    Math.min(
+      storyLines.length - 1,
+      Math.floor(
+        progress *
+        storyLines.length
+      )
+    );
+
+  $('#storySubtitle').textContent =
+    storyLines[index];
+
+  $('#storyProgressFill').style.width =
+    `${progress * 100}%`;
+}
+
+async function startStoryAudio() {
+  const intro = $('#storyIntro');
+  const audio = $('#storyAudio');
+
+  if (
+    !intro ||
+    !audio
+  ) {
+    show('start');
+    return;
+  }
+
+  intro.classList.remove(
+    'waiting'
+  );
+
+  audio.volume =
+    sound
+      ? 1
+      : 0;
+
+  try {
+    audio.currentTime = 0;
+  } catch {}
+
+  try {
+    await audio.play();
+  } catch {
+    /*
+      Browser blockieren Audio teilweise,
+      bis der Spieler einmal geklickt hat.
+    */
+    intro.classList.add(
+      'waiting'
+    );
+
+    $('#storySubtitle').textContent =
+      'Klicke auf „INTRO STARTEN“, um die Geschichte mit Ton abzuspielen.';
+  }
+}
+
+async function playStory(
+  replay = false
+) {
+  storyReplay = replay;
+  storyRunning = true;
+
+  show('storyIntro');
+
+  $('#storySubtitle').textContent =
+    storyLines[0];
+
+  $('#storyProgressFill').style.width =
+    '0%';
+
+  await startStoryAudio();
+}
+
+$('#storyAudio')
+  ?.addEventListener(
+    'timeupdate',
+    syncStorySubtitle
+  );
+
+$('#storyAudio')
+  ?.addEventListener(
+    'ended',
+    () => {
+      finishStory(true);
+    }
+  );
+
+$('#storyAudio')
+  ?.addEventListener(
+    'error',
+    () => {
+      storyRunning = false;
+
+      $('#storySubtitle').textContent =
+        'Die Intro-Audiodatei konnte nicht geladen werden.';
+
+      $('#storyIntro')
+        ?.classList
+        .add('waiting');
+    }
+  );
+
+$('#storyStartBtn').onclick =
+  async () => {
+    sfx.click();
+    await startStoryAudio();
+  };
+
+$('#storySkipBtn').onclick =
+  () => {
+    sfx.click();
+    finishStory(true);
+  };
+
+$('#storyBtn').onclick =
+  () => {
+    sfx.click();
+    playStory(true);
+  };
+
+
 /* =========================================================
    PRELOAD
 ========================================================= */
@@ -423,7 +633,15 @@ async function preload() {
 
   await boot();
 
-  show('start');
+  if (
+    localStorage.getItem(
+      STORY_SEEN_KEY
+    ) !== '1'
+  ) {
+    await playStory(false);
+  } else {
+    show('start');
+  }
 }
 
 
@@ -597,6 +815,16 @@ $('#soundBtn').onclick =
       sound
         ? '🔊 SOUND AN'
         : '🔇 SOUND AUS';
+
+    const storyAudio =
+      $('#storyAudio');
+
+    if (storyAudio) {
+      storyAudio.volume =
+        sound
+          ? 1
+          : 0;
+    }
 
     if (sound) {
       sfx.power();
