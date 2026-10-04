@@ -27,46 +27,51 @@ jobs:
       - name: 🌐 Web-Version bauen
         run: npm run build
 
-      - name: 🖥️ Desktop Builder installieren
-        run: |
-          npm install --no-save electron@35 electron-builder@26
+      - name: 🖥️ Electron installieren
+        run: npm install --no-save electron@35 electron-builder@26
 
-      - name: 🗑️ Server SQLite aus Desktop-Build entfernen
+      - name: 🗑️ better-sqlite3 aus Desktop-Build entfernen
         shell: powershell
         run: |
           if (Test-Path "node_modules/better-sqlite3") {
             Remove-Item "node_modules/better-sqlite3" -Recurse -Force
           }
 
-          Write-Host "better-sqlite3 wurde aus dem Desktop-Paket entfernt."
+          Write-Host "SQLite Desktop-Abhängigkeit entfernt."
 
       - name: 🐉 Windows Installer bauen
         shell: powershell
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: |
-          npx electron-builder `
-            --win nsis `
-            --publish never `
-            -c.npmRebuild=false
+          npx electron-builder --win nsis --publish never --config.npmRebuild=false
 
-      - name: 🔎 Ergebnis anzeigen
+      - name: 🔎 EXE suchen
         shell: powershell
         run: |
           Write-Host "===== CHINA CHAOS WINDOWS BUILD ====="
 
-          if (Test-Path "dist-desktop") {
-            Get-ChildItem "dist-desktop" -Recurse
-          } else {
+          if (!(Test-Path "dist-desktop")) {
             Write-Error "dist-desktop wurde nicht erstellt."
             exit 1
           }
 
-      - name: 📤 China Chaos Windows hochladen
+          Get-ChildItem "dist-desktop" -Recurse
+
+          $exe = Get-ChildItem "dist-desktop" -Filter "*.exe" -Recurse
+
+          if (!$exe) {
+            Write-Error "Keine EXE gefunden."
+            exit 1
+          }
+
+          Write-Host "EXE erfolgreich erstellt:"
+          $exe.FullName
+
+      - name: 📤 Windows-Version hochladen
         uses: actions/upload-artifact@v4
         with:
           name: China-Chaos-Windows
-          path: |
-            dist-desktop/*.exe
+          path: dist-desktop/*.exe
           if-no-files-found: error
           retention-days: 30
