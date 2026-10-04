@@ -1,10 +1,23 @@
 name: 🐉 China Chaos Windows Release
 
 on:
-  workflow_dispatch:
+  # Automatisch bauen, wenn relevante Dateien auf main geändert werden
   push:
+    branches:
+      - main
+
+    paths:
+      - "package.json"
+      - "package-lock.json"
+      - "desktop/**"
+      - "client/**"
+      - ".github/workflows/build-windows.yml"
+
     tags:
       - "v*"
+
+  # Zusätzlich weiterhin manuell startbar
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -15,8 +28,18 @@ jobs:
     runs-on: windows-latest
 
     steps:
+
+      # ========================================================
+      # REPOSITORY
+      # ========================================================
+
       - name: 📥 Repository laden
         uses: actions/checkout@v4
+
+
+      # ========================================================
+      # NODE.JS
+      # ========================================================
 
       - name: 🟢 Node.js 22 installieren
         uses: actions/setup-node@v4
@@ -24,75 +47,173 @@ jobs:
           node-version: "22"
           cache: "npm"
 
+
+      # ========================================================
+      # DEPENDENCIES
+      # ========================================================
+
       - name: 📦 Projekt-Abhängigkeiten installieren
         run: npm install --no-audit --no-fund
 
-      - name: ⚡ Electron installieren
-        run: npm install --no-save --no-audit --no-fund electron@35.7.5 electron-builder@26.15.3 electron-updater@6.6.2
+
+      # ========================================================
+      # ELECTRON PRÜFEN
+      # ========================================================
 
       - name: 🔎 Electron prüfen
         shell: powershell
         run: |
+          Write-Host ""
+          Write-Host "=============================="
+          Write-Host "CHINA CHAOS BUILD CHECK"
+          Write-Host "=============================="
+          Write-Host ""
+
+          Write-Host "Node:"
+          node --version
+
+          Write-Host ""
+          Write-Host "NPM:"
+          npm --version
+
+          Write-Host ""
           Write-Host "Electron:"
           npx electron --version
 
+          Write-Host ""
           Write-Host "Electron Builder:"
           npx electron-builder --version
+
+          Write-Host ""
 
           if (!(Test-Path "desktop/main.cjs")) {
             Write-Error "desktop/main.cjs fehlt."
             exit 1
           }
 
-          Write-Host "desktop/main.cjs gefunden."
+          if (!(Test-Path "desktop/build/icon.ico")) {
+            Write-Error "desktop/build/icon.ico fehlt."
+            exit 1
+          }
 
-      - name: 🌐 Web-Version bauen
-        run: npm run build
+          if (!(Test-Path "package.json")) {
+            Write-Error "package.json fehlt."
+            exit 1
+          }
+
+          Write-Host "desktop/main.cjs gefunden."
+          Write-Host "desktop/build/icon.ico gefunden."
+          Write-Host "package.json gefunden."
+
+
+      # ========================================================
+      # VERSION AUSLESEN
+      # ========================================================
+
+      - name: 🏷️ Version prüfen
+        id: version
+        shell: powershell
+        run: |
+          $package = Get-Content package.json -Raw | ConvertFrom-Json
+
+          $version = $package.version
+
+          Write-Host ""
+          Write-Host "China Chaos Version:"
+          Write-Host $version
+
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+
+      # ========================================================
+      # WINDOWS INSTALLER
+      # ========================================================
 
       - name: 🐉 Windows Installer bauen
         shell: powershell
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: |
+          Write-Host ""
+          Write-Host "=============================="
+          Write-Host "WINDOWS BUILD"
+          Write-Host "=============================="
+          Write-Host ""
+
           npx electron-builder `
             --win nsis `
             --publish never `
             --config.npmRebuild=false
 
+
+      # ========================================================
+      # RELEASE DATEIEN SAMMELN
+      # ========================================================
+
       - name: 📁 Release-Dateien sammeln
         shell: powershell
         run: |
+          Write-Host ""
+          Write-Host "=============================="
+          Write-Host "RELEASE DATEIEN SUCHEN"
+          Write-Host "=============================="
+          Write-Host ""
+
+          if (Test-Path "release-files") {
+            Remove-Item `
+              "release-files" `
+              -Recurse `
+              -Force
+          }
+
           New-Item `
             -ItemType Directory `
             -Force `
-            -Path "release-files" | Out-Null
+            -Path "release-files" |
+            Out-Null
+
 
           $searchFolders = @(
-            "dist-desktop",
-            "dist"
+            "dist",
+            "dist-desktop"
           )
 
+
           $installerFound = $false
+          $latestFound = $false
+          $blockmapFound = $false
+
 
           foreach ($folder in $searchFolders) {
 
             if (!(Test-Path $folder)) {
+              Write-Host "$folder existiert nicht - überspringe."
               continue
             }
 
-            Write-Host "Prüfe $folder..."
+
+            Write-Host ""
+            Write-Host "Prüfe:"
+            Write-Host $folder
+
+
+            # --------------------------------------------------
+            # EXE
+            # --------------------------------------------------
 
             $installers = Get-ChildItem `
               -Path $folder `
-              -Filter "*.exe" `
+              -Filter "ChinaChaos-Setup-*.exe" `
               -File `
               -Recurse |
               Where-Object {
                 $_.FullName -notmatch "win-unpacked"
               }
 
+
             foreach ($file in $installers) {
 
+              Write-Host ""
               Write-Host "Installer gefunden:"
               Write-Host $file.FullName
 
@@ -104,31 +225,47 @@ jobs:
               $installerFound = $true
             }
 
+
+            # --------------------------------------------------
+            # LATEST.YML
+            # --------------------------------------------------
+
             $latestFiles = Get-ChildItem `
               -Path $folder `
               -Filter "latest.yml" `
               -File `
               -Recurse
 
+
             foreach ($file in $latestFiles) {
 
-              Write-Host "Auto-Update Datei gefunden:"
+              Write-Host ""
+              Write-Host "latest.yml gefunden:"
               Write-Host $file.FullName
 
               Copy-Item `
                 $file.FullName `
                 -Destination "release-files/latest.yml" `
                 -Force
+
+              $latestFound = $true
             }
+
+
+            # --------------------------------------------------
+            # BLOCKMAP
+            # --------------------------------------------------
 
             $blockmaps = Get-ChildItem `
               -Path $folder `
-              -Filter "*.blockmap" `
+              -Filter "ChinaChaos-Setup-*.blockmap" `
               -File `
               -Recurse
 
+
             foreach ($file in $blockmaps) {
 
+              Write-Host ""
               Write-Host "Blockmap gefunden:"
               Write-Host $file.FullName
 
@@ -136,37 +273,79 @@ jobs:
                 $file.FullName `
                 -Destination "release-files/$($file.Name)" `
                 -Force
+
+              $blockmapFound = $true
             }
           }
 
+
+          # ====================================================
+          # DATEIEN VALIDIEREN
+          # ====================================================
+
           if (!$installerFound) {
-            Write-Error "Keine China Chaos Setup EXE gefunden."
+            Write-Error "Keine ChinaChaos Setup EXE gefunden."
             exit 1
           }
+
+
+          if (!$latestFound) {
+            Write-Error "latest.yml wurde nicht erzeugt."
+            exit 1
+          }
+
+
+          if (!$blockmapFound) {
+            Write-Error "Keine Blockmap wurde erzeugt."
+            exit 1
+          }
+
 
           Write-Host ""
           Write-Host "=============================="
           Write-Host "CHINA CHAOS RELEASE DATEIEN"
           Write-Host "=============================="
+          Write-Host ""
 
-          Get-ChildItem "release-files"
+          Get-ChildItem "release-files" |
+            Format-Table Name, Length
 
-      - name: 📤 Windows-Version hochladen
+
+      # ========================================================
+      # ACTIONS ARTIFACT
+      # ========================================================
+
+      - name: 📤 Windows-Version als Artifact hochladen
         uses: actions/upload-artifact@v4
         with:
-          name: China-Chaos-Windows
+          name: China-Chaos-Windows-${{ steps.version.outputs.version }}
           path: release-files/*
           if-no-files-found: error
           retention-days: 30
 
-      - name: 🚀 GitHub Release veröffentlichen
+
+      # ========================================================
+      # GITHUB RELEASE
+      #
+      # Nur bei Tags wie:
+      #
+      # v5.3.2
+      # v5.3.3
+      # v5.4.0
+      #
+      # ========================================================
+
+      - name: 🚀 Dateien zum GitHub Release hochladen
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           name: China Chaos ${{ github.ref_name }}
+
           generate_release_notes: true
+
           draft: false
           prerelease: false
+
           files: |
             release-files/*.exe
             release-files/*.yml
