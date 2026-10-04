@@ -37,6 +37,11 @@ import {
   verifySigned
 } from './auth.js';
 
+
+/* =========================================================
+   PATHS / SYSTEM
+========================================================= */
+
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
 
 const systemFile = path.join(
@@ -47,12 +52,10 @@ const systemFile = path.join(
 function loadSystem() {
   try {
     return {
-      ...{
-        maintenance: false,
-        version: '5.1.0',
-        notes: '',
-        updatedAt: Date.now()
-      },
+      maintenance: false,
+      version: '5.3.3',
+      notes: '',
+      updatedAt: Date.now(),
       ...JSON.parse(
         fs.readFileSync(systemFile, 'utf8')
       )
@@ -60,7 +63,7 @@ function loadSystem() {
   } catch {
     return {
       maintenance: false,
-      version: '5.1.0',
+      version: '5.3.3',
       notes: '',
       updatedAt: Date.now()
     };
@@ -90,12 +93,26 @@ function saveSystem() {
 
 setSystemStateProvider(() => systemState);
 
+
+/* =========================================================
+   CLIENT
+========================================================= */
+
+/*
+  WICHTIG:
+  index.html / main.js / style.css liegen direkt in /client
+  und NICHT in /client/dist
+*/
+
 const dist = path.join(
-  path.dirname(
-    fileURLToPath(import.meta.url)
-  ),
-  '../client/dist'
+  rootDir,
+  '../client'
 );
+
+
+/* =========================================================
+   EXPRESS
+========================================================= */
 
 const app = express();
 
@@ -116,36 +133,38 @@ app.use(
   })
 );
 
+
 /* =========================================================
-   CONFIG
+   CONFIG / SYSTEM API
 ========================================================= */
 
-app.get('/api/config', (_, res) =>
+app.get('/api/config', (_, res) => {
   res.json({
     clientId:
       process.env.DISCORD_CLIENT_ID || '',
     discordRequired: true,
     version: systemState.version
-  })
-);
+  });
+});
 
-app.get('/api/system', (_, res) =>
+app.get('/api/system', (_, res) => {
   res.json({
     ...systemState,
     desktopAvailable: true
-  })
-);
+  });
+});
+
 
 /* =========================================================
    WINDOWS DOWNLOAD
 ========================================================= */
 
 /*
-  Die alte "Desktop-App ist vorbereitet"-Seite
-  wurde entfernt.
+  Die alte V5.1 "Desktop-App ist vorbereitet"-Seite
+  existiert nicht mehr.
 
-  Dieser Link führt jetzt immer zur neuesten
-  veröffentlichten China-Chaos-Version.
+  /download/windows führt jetzt zur neuesten
+  GitHub-Release.
 */
 
 app.get('/download/windows', (req, res) => {
@@ -154,19 +173,21 @@ app.get('/download/windows', (req, res) => {
   );
 });
 
+
 /* =========================================================
    LEADERBOARD
 ========================================================= */
 
-app.get('/api/leaderboard', (_, res) =>
+app.get('/api/leaderboard', (_, res) => {
   res.json({
     top: top(10),
     records: records()
-  })
-);
+  });
+});
+
 
 /* =========================================================
-   DISCORD ACCOUNT
+   DISCORD USER
 ========================================================= */
 
 app.get('/api/me', (req, res) => {
@@ -175,11 +196,9 @@ app.get('/api/me', (req, res) => {
   );
 
   if (!u) {
-    return res
-      .status(401)
-      .json({
-        error: 'login_required'
-      });
+    return res.status(401).json({
+      error: 'login_required'
+    });
   }
 
   res.json({
@@ -188,6 +207,11 @@ app.get('/api/me', (req, res) => {
     avatar: u.avatar || ''
   });
 });
+
+
+/* =========================================================
+   SIGNED /CHINA LOGIN
+========================================================= */
 
 app.get('/auth/link', (req, res) => {
   const u = verifySigned(
@@ -212,6 +236,11 @@ app.get('/auth/link', (req, res) => {
   res.redirect('/');
 });
 
+
+/* =========================================================
+   DISCORD OAUTH LOGIN
+========================================================= */
+
 app.get('/login', (req, res) => {
   const base = (
     process.env.GAME_URL ||
@@ -222,30 +251,29 @@ app.get('/login', (req, res) => {
     process.env.DISCORD_REDIRECT_URI ||
     `${base}/auth/discord/callback`;
 
-  const state =
-    crypto
-      .randomBytes(24)
-      .toString('hex');
+  const state = crypto
+    .randomBytes(24)
+    .toString('hex');
 
   res.setHeader(
     'Set-Cookie',
     `cc_oauth_state=${state}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600`
   );
 
-  const q =
-    new URLSearchParams({
-      client_id:
-        process.env.DISCORD_CLIENT_ID || '',
-      response_type: 'code',
-      redirect_uri: redirect,
-      scope: 'identify',
-      state
-    });
+  const q = new URLSearchParams({
+    client_id:
+      process.env.DISCORD_CLIENT_ID || '',
+    response_type: 'code',
+    redirect_uri: redirect,
+    scope: 'identify',
+    state
+  });
 
   res.redirect(
     `https://discord.com/oauth2/authorize?${q}`
   );
 });
+
 
 app.get(
   '/auth/discord/callback',
@@ -258,14 +286,11 @@ app.get(
 
       if (
         !state ||
-        state !==
-          String(req.query.state || '')
+        state !== String(req.query.state || '')
       ) {
         return res
           .status(400)
-          .send(
-            'Ungültige Anmeldung.'
-          );
+          .send('Ungültige Anmeldung.');
       }
 
       const base = (
@@ -277,42 +302,34 @@ app.get(
         process.env.DISCORD_REDIRECT_URI ||
         `${base}/auth/discord/callback`;
 
-      const tr =
-        await fetch(
-          'https://discord.com/api/oauth2/token',
-          {
-            method: 'POST',
+      const tr = await fetch(
+        'https://discord.com/api/oauth2/token',
+        {
+          method: 'POST',
 
-            headers: {
-              'Content-Type':
-                'application/x-www-form-urlencoded'
-            },
+          headers: {
+            'Content-Type':
+              'application/x-www-form-urlencoded'
+          },
 
-            body:
-              new URLSearchParams({
-                client_id:
-                  process.env
-                    .DISCORD_CLIENT_ID ||
-                  '',
+          body: new URLSearchParams({
+            client_id:
+              process.env.DISCORD_CLIENT_ID || '',
 
-                client_secret:
-                  process.env
-                    .DISCORD_CLIENT_SECRET ||
-                  '',
+            client_secret:
+              process.env.DISCORD_CLIENT_SECRET || '',
 
-                grant_type:
-                  'authorization_code',
+            grant_type:
+              'authorization_code',
 
-                code:
-                  String(
-                    req.query.code || ''
-                  ),
+            code:
+              String(req.query.code || ''),
 
-                redirect_uri:
-                  redirect
-              })
-          }
-        );
+            redirect_uri:
+              redirect
+          })
+        }
+      );
 
       const td = await tr.json();
 
@@ -327,16 +344,15 @@ app.get(
           );
       }
 
-      const ur =
-        await fetch(
-          'https://discord.com/api/users/@me',
-          {
-            headers: {
-              Authorization:
-                `Bearer ${td.access_token}`
-            }
+      const ur = await fetch(
+        'https://discord.com/api/users/@me',
+        {
+          headers: {
+            Authorization:
+              `Bearer ${td.access_token}`
           }
-        );
+        }
+      );
 
       const d = await ur.json();
 
@@ -354,11 +370,10 @@ app.get(
       const u = {
         id: String(d.id),
 
-        name:
-          cleanName(
-            d.global_name ||
-            d.username
-          ),
+        name: cleanName(
+          d.global_name ||
+          d.username
+        ),
 
         avatar:
           avatarUrl(d)
@@ -370,12 +385,12 @@ app.get(
         'Set-Cookie',
         [
           sessionCookie(u),
-
           'cc_oauth_state=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0'
         ]
       );
 
       res.redirect('/');
+
     } catch (e) {
       console.error(
         'OAuth:',
@@ -391,27 +406,35 @@ app.get(
   }
 );
 
-app.post(
-  '/api/logout',
-  (req, res) => {
-    res.setHeader(
-      'Set-Cookie',
-      clearSessionCookie()
-    );
-
-    res.json({
-      ok: true
-    });
-  }
-);
 
 /* =========================================================
-   STATIC WEBSITE
+   LOGOUT
+========================================================= */
+
+app.post('/api/logout', (req, res) => {
+  res.setHeader(
+    'Set-Cookie',
+    clearSessionCookie()
+  );
+
+  res.json({
+    ok: true
+  });
+});
+
+
+/* =========================================================
+   STATIC GAME
 ========================================================= */
 
 app.use(
   express.static(dist)
 );
+
+
+/* =========================================================
+   HTTP / SOCKET.IO
+========================================================= */
 
 const server =
   http.createServer(app);
@@ -425,11 +448,11 @@ const io =
     }
   });
 
-const rooms =
-  new Map();
+const rooms = new Map();
+
 
 /* =========================================================
-   ADMIN PANEL
+   ADMIN
 ========================================================= */
 
 const ADMIN_IP =
@@ -442,15 +465,13 @@ const ADMIN_PASSWORD =
 const adminSessions =
   new Map();
 
+
 function requestIp(req) {
-  const f =
-    String(
-      req.headers[
-        'x-forwarded-for'
-      ] || ''
-    )
-      .split(',')[0]
-      .trim();
+  const f = String(
+    req.headers['x-forwarded-for'] || ''
+  )
+    .split(',')[0]
+    .trim();
 
   return (
     f ||
@@ -460,6 +481,7 @@ function requestIp(req) {
   ).replace(/^::ffff:/, '');
 }
 
+
 function ipAllowed(req) {
   return (
     requestIp(req) ===
@@ -467,33 +489,30 @@ function ipAllowed(req) {
   );
 }
 
+
 function cookies(req) {
   return Object.fromEntries(
-    String(
-      req.headers.cookie || ''
-    )
+    String(req.headers.cookie || '')
       .split(';')
       .map(x =>
         x
           .trim()
           .split('=')
-          .map(
-            decodeURIComponent
-          )
+          .map(decodeURIComponent)
       )
-      .filter(
-        x =>
-          x.length === 2
-      )
+      .filter(x => x.length === 2)
   );
 }
 
-function adminAuthed(req) {
-  if (!ipAllowed(req))
-    return false;
 
-  if (!ADMIN_PASSWORD)
+function adminAuthed(req) {
+  if (!ipAllowed(req)) {
+    return false;
+  }
+
+  if (!ADMIN_PASSWORD) {
     return true;
+  }
 
   const token =
     cookies(req).cc_admin;
@@ -506,10 +525,9 @@ function adminAuthed(req) {
     !exp ||
     exp < Date.now()
   ) {
-    if (token)
-      adminSessions.delete(
-        token
-      );
+    if (token) {
+      adminSessions.delete(token);
+    }
 
     return false;
   }
@@ -517,11 +535,8 @@ function adminAuthed(req) {
   return true;
 }
 
-function adminOnly(
-  req,
-  res,
-  next
-) {
+
+function adminOnly(req, res, next) {
   if (!ipAllowed(req)) {
     return res
       .status(404)
@@ -540,69 +555,62 @@ function adminOnly(
   next();
 }
 
-app.get(
-  '/admin',
-  (req, res) => {
-    if (!ipAllowed(req)) {
-      return res
-        .status(404)
-        .send('Not found');
-    }
 
-    res.sendFile(
-      path.join(
-        path.dirname(
-          fileURLToPath(
-            import.meta.url
-          )
-        ),
-        '../client/admin.html'
-      )
-    );
+/* =========================================================
+   ADMIN FILES
+========================================================= */
+
+app.get('/admin', (req, res) => {
+  if (!ipAllowed(req)) {
+    return res
+      .status(404)
+      .send('Not found');
   }
-);
 
-app.get(
-  '/admin.css',
-  (req, res) => {
-    if (!ipAllowed(req))
-      return res
-        .status(404)
-        .end();
+  res.sendFile(
+    path.join(
+      rootDir,
+      '../client/admin.html'
+    )
+  );
+});
 
-    res.sendFile(
-      path.join(
-        path.dirname(
-          fileURLToPath(
-            import.meta.url
-          )
-        ),
-        '../client/admin.css'
-      )
-    );
+
+app.get('/admin.css', (req, res) => {
+  if (!ipAllowed(req)) {
+    return res
+      .status(404)
+      .end();
   }
-);
 
-app.get(
-  '/admin.js',
-  (req, res) => {
-    if (!ipAllowed(req))
-      return res
-        .status(404)
-        .end();
+  res.sendFile(
+    path.join(
+      rootDir,
+      '../client/admin.css'
+    )
+  );
+});
 
-    res.sendFile(
-      path.join(
-        path.dirname(
-          fileURLToPath(
-            import.meta.url
-          )
-        ),
-        '../client/admin.js'
-      )
-    );
+
+app.get('/admin.js', (req, res) => {
+  if (!ipAllowed(req)) {
+    return res
+      .status(404)
+      .end();
   }
-);
+
+  res.sendFile(
+    path.join(
+      rootDir,
+      '../client/admin.js'
+    )
+  );
+});
+
+
+/* =========================================================
+   ADMIN LOGIN
+========================================================= */
 
 app.post(
   '/api/admin/login',
@@ -618,8 +626,7 @@ app.post(
     if (
       ADMIN_PASSWORD &&
       String(
-        req.body?.password ||
-        ''
+        req.body?.password || ''
       ) !== ADMIN_PASSWORD
     ) {
       return res
@@ -630,15 +637,14 @@ app.post(
         });
     }
 
-    const token =
-      crypto
-        .randomBytes(32)
-        .toString('hex');
+    const token = crypto
+      .randomBytes(32)
+      .toString('hex');
 
     adminSessions.set(
       token,
       Date.now() +
-        12 * 60 * 60 * 1000
+      12 * 60 * 60 * 1000
     );
 
     res.setHeader(
@@ -652,14 +658,16 @@ app.post(
   }
 );
 
+
 app.post(
   '/api/admin/logout',
   (req, res) => {
     const t =
       cookies(req).cc_admin;
 
-    if (t)
+    if (t) {
       adminSessions.delete(t);
+    }
 
     res.setHeader(
       'Set-Cookie',
@@ -672,10 +680,15 @@ app.post(
   }
 );
 
+
+/* =========================================================
+   ADMIN STATE
+========================================================= */
+
 app.get(
   '/api/admin/state',
   adminOnly,
-  (req, res) =>
+  (req, res) => {
     res.json({
       ip: requestIp(req),
 
@@ -692,37 +705,51 @@ app.get(
         [...rooms.entries()].map(
           ([id, g]) => ({
             id,
-            phase: g.phase,
-            mode: g.mode,
+
+            phase:
+              g.phase,
+
+            mode:
+              g.mode,
+
             difficulty:
               g.difficulty,
+
             battleType:
               g.battleType,
-            map: g.map,
+
+            map:
+              g.map,
 
             players:
-              [
-                ...g.players.values()
-              ]
+              [...g.players.values()]
                 .filter(
-                  p =>
-                    p.sockets.size
+                  p => p.sockets.size
                 )
                 .map(p => ({
-                  id: p.id,
-                  name: p.name,
+                  id:
+                    p.id,
+
+                  name:
+                    p.name,
+
                   score:
                     p.score,
+
                   coins:
                     p.coins,
+
                   hp:
                     Math.round(
                       p.hp
                     ),
+
                   kills:
                     p.kills,
+
                   deaths:
                     p.deaths,
+
                   host:
                     p.id ===
                     g.host
@@ -730,12 +757,15 @@ app.get(
           })
         ),
 
-      top: top(50),
+      top:
+        top(50),
 
       records:
         records()
-    })
+    });
+  }
 );
+
 
 /* =========================================================
    ADMIN ACTIONS
@@ -749,9 +779,12 @@ app.post(
       const b =
         req.body || {};
 
-      if (
-        b.type === 'stat'
-      ) {
+
+      /* -----------------------------
+         STAT
+      ----------------------------- */
+
+      if (b.type === 'stat') {
         adminSetStat(
           b.id,
           b.field,
@@ -762,6 +795,11 @@ app.post(
           ok: true
         });
       }
+
+
+      /* -----------------------------
+         DELETE STAT
+      ----------------------------- */
 
       if (
         b.type ===
@@ -776,6 +814,11 @@ app.post(
         });
       }
 
+
+      /* -----------------------------
+         RESET RECORD
+      ----------------------------- */
+
       if (
         b.type ===
         'resetRecord'
@@ -789,9 +832,16 @@ app.post(
         });
       }
 
+
+      /* -----------------------------
+         SYSTEM
+      ----------------------------- */
+
       if (
-        b.type === 'system'
+        b.type ===
+        'system'
       ) {
+
         if (
           b.action ===
           'maintenance'
@@ -805,8 +855,10 @@ app.post(
           ) {
             systemState = {
               ...systemState,
+
               maintenance:
                 next,
+
               updatedAt:
                 Date.now()
             };
@@ -817,6 +869,7 @@ app.post(
               next
                 ? 'maintenance'
                 : 'online',
+
               systemState.version
             );
           }
@@ -827,6 +880,7 @@ app.post(
               systemState
           });
         }
+
 
         if (
           b.action ===
@@ -840,9 +894,7 @@ app.post(
               .slice(0, 32);
 
           if (
-            !/^[0-9A-Za-z._-]+$/.test(
-              v
-            )
+            !/^[0-9A-Za-z._-]+$/.test(v)
           ) {
             return res
               .status(400)
@@ -854,6 +906,7 @@ app.post(
 
           systemState = {
             ...systemState,
+
             version: v,
 
             notes:
@@ -877,6 +930,7 @@ app.post(
           });
         }
 
+
         if (
           b.action ===
           'announce'
@@ -891,6 +945,7 @@ app.post(
           });
         }
 
+
         return res
           .status(400)
           .json({
@@ -898,6 +953,11 @@ app.post(
               'Ungültige System-Aktion'
           });
       }
+
+
+      /* -----------------------------
+         ROOM
+      ----------------------------- */
 
       const g =
         rooms.get(
@@ -913,25 +973,36 @@ app.post(
           });
       }
 
+
       if (
-        b.type === 'room'
+        b.type ===
+        'room'
       ) {
+
         if (
-          b.action === 'start'
+          b.action ===
+          'start'
         ) {
-          g.start(g.host);
+          g.start(
+            g.host
+          );
         }
 
         else if (
-          b.action === 'lobby'
+          b.action ===
+          'lobby'
         ) {
+
           if (
-            g.phase === 'over'
+            g.phase ===
+            'over'
           ) {
             g.backToLobby(
               g.host
             );
-          } else {
+          }
+
+          else {
             g.reset();
 
             g.phase =
@@ -956,24 +1027,33 @@ app.post(
         }
 
         else if (
-          b.action === 'end'
+          b.action ===
+          'end'
         ) {
-          g.mode === 'battle'
-            ? g.finishBattle(
-                'admin'
-              )
-            : g.finish(
-                'admin'
-              );
+
+          if (
+            g.mode ===
+            'battle'
+          ) {
+            g.finishBattle(
+              'admin'
+            );
+          }
+
+          else {
+            g.finish(
+              'admin'
+            );
+          }
         }
 
         else if (
           b.action ===
-            'event' &&
+          'event' &&
           g.mode ===
-            'classic' &&
+          'classic' &&
           g.phase ===
-            'playing'
+          'playing'
         ) {
           g.event(
             Date.now()
@@ -994,8 +1074,14 @@ app.post(
         });
       }
 
+
+      /* -----------------------------
+         PLAYER
+      ----------------------------- */
+
       if (
-        b.type === 'player'
+        b.type ===
+        'player'
       ) {
         const p =
           g.players.get(
@@ -1018,22 +1104,26 @@ app.post(
             ) || 0
           );
 
+
         if (
-          b.action === 'score'
+          b.action ===
+          'score'
         ) {
           p.score =
             Math.max(0, v);
         }
 
         else if (
-          b.action === 'coins'
+          b.action ===
+          'coins'
         ) {
           p.coins =
             Math.max(0, v);
         }
 
         else if (
-          b.action === 'kills'
+          b.action ===
+          'kills'
         ) {
           p.kills =
             Math.max(0, v);
@@ -1046,14 +1136,15 @@ app.post(
         }
 
         else if (
-          b.action === 'hp'
+          b.action ===
+          'hp'
         ) {
           p.hp =
             Math.max(
               0,
               Math.min(
                 p.maxHp ||
-                  100,
+                100,
                 v
               )
             );
@@ -1067,17 +1158,20 @@ app.post(
         }
 
         else if (
-          b.action === 'heal'
+          b.action ===
+          'heal'
         ) {
           p.hp =
-            p.maxHp || 100;
+            p.maxHp ||
+            100;
 
           p.dead = false;
           p.spec = false;
         }
 
         else if (
-          b.action === 'kill'
+          b.action ===
+          'kill'
         ) {
           p.hp = 0;
           p.dead = true;
@@ -1087,15 +1181,20 @@ app.post(
         }
 
         else if (
-          b.action === 'kick'
+          b.action ===
+          'kick'
         ) {
           for (
             const sid of
             [...p.sockets]
           ) {
-            io.sockets.sockets
+            io
+              .sockets
+              .sockets
               .get(sid)
-              ?.disconnect(true);
+              ?.disconnect(
+                true
+              );
           }
 
           g.players.delete(
@@ -1124,19 +1223,21 @@ app.post(
         });
       }
 
-      res
+
+      return res
         .status(400)
         .json({
           error:
             'Ungültige Aktion'
         });
+
     } catch (e) {
       console.error(
         'Admin action:',
         e
       );
 
-      res
+      return res
         .status(500)
         .json({
           error:
@@ -1146,12 +1247,14 @@ app.post(
   }
 );
 
+
 /* =========================================================
-   ROOM CODES
+   ROOM CODE
 ========================================================= */
 
 const alphabet =
   'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
 
 function code() {
   let c = '';
@@ -1168,16 +1271,18 @@ function code() {
         alphabet[
           Math.floor(
             Math.random() *
-              alphabet.length
+            alphabet.length
           )
         ];
     }
+
   } while (
     rooms.has(c)
   );
 
   return c;
 }
+
 
 function cleanCode(c) {
   return String(c || '')
@@ -1189,6 +1294,7 @@ function cleanCode(c) {
     .slice(0, 6);
 }
 
+
 /* =========================================================
    SOCKET USER
 ========================================================= */
@@ -1196,24 +1302,33 @@ function cleanCode(c) {
 function socketUser(socket) {
   const u =
     sessionFromCookie(
-      socket.handshake.headers
+      socket
+        .handshake
+        .headers
         .cookie
     );
 
-  if (!u)
+  if (!u) {
     return null;
+  }
 
   return {
-    id: String(u.id),
+    id:
+      String(u.id),
+
     name:
       cleanName(u.name),
+
     avatar:
       String(
         u.avatar || ''
       ),
-    skin: 'discord'
+
+    skin:
+      'discord'
   };
 }
+
 
 /* =========================================================
    SOCKET.IO
@@ -1222,6 +1337,7 @@ function socketUser(socket) {
 io.on(
   'connection',
   socket => {
+
     if (
       systemState.maintenance
     ) {
@@ -1237,12 +1353,14 @@ io.on(
       return;
     }
 
+
     let game = null;
     let uid = null;
     let msgs = 0;
 
     const user =
       socketUser(socket);
+
 
     if (!user) {
       socket.emit(
@@ -1257,24 +1375,33 @@ io.on(
       return;
     }
 
+
     upsertProfile(user);
+
 
     const bucket =
       setInterval(
-        () =>
-          msgs = 0,
+        () => {
+          msgs = 0;
+        },
         1000
       );
 
-    const ok =
-      () =>
-        ++msgs <= 120;
+
+    const ok = () => {
+      msgs++;
+      return msgs <= 120;
+    };
+
+
+    /* CREATE */
 
     socket.on(
       'create',
       () => {
-        if (game)
+        if (game) {
           return;
+        }
 
         const room =
           code();
@@ -1313,11 +1440,15 @@ io.on(
       }
     );
 
+
+    /* JOIN */
+
     socket.on(
       'join',
       d => {
-        if (game)
+        if (game) {
           return;
+        }
 
         const room =
           cleanCode(
@@ -1325,7 +1456,9 @@ io.on(
           );
 
         const g =
-          rooms.get(room);
+          rooms.get(
+            room
+          );
 
         if (!g) {
           return socket.emit(
@@ -1363,6 +1496,9 @@ io.on(
       }
     );
 
+
+    /* INPUT */
+
     socket.on(
       'input',
       d => {
@@ -1379,6 +1515,9 @@ io.on(
         }
       }
     );
+
+
+    /* PICKUP */
 
     socket.on(
       'pickup',
@@ -1398,19 +1537,22 @@ io.on(
       }
     );
 
+
     socket.on(
       'ready',
       v => {
         if (
           game &&
           ok()
-        )
+        ) {
           game.setReady(
             uid,
             v
           );
+        }
       }
     );
+
 
     socket.on(
       'difficulty',
@@ -1418,13 +1560,15 @@ io.on(
         if (
           game &&
           ok()
-        )
+        ) {
           game.setDifficulty(
             uid,
             v
           );
+        }
       }
     );
+
 
     socket.on(
       'mode',
@@ -1432,13 +1576,15 @@ io.on(
         if (
           game &&
           ok()
-        )
+        ) {
           game.setMode(
             uid,
             v
           );
+        }
       }
     );
+
 
     socket.on(
       'battleType',
@@ -1446,13 +1592,15 @@ io.on(
         if (
           game &&
           ok()
-        )
+        ) {
           game.setBattleType(
             uid,
             v
           );
+        }
       }
     );
+
 
     socket.on(
       'map',
@@ -1460,13 +1608,15 @@ io.on(
         if (
           game &&
           ok()
-        )
+        ) {
           game.setMap(
             uid,
             v
           );
+        }
       }
     );
+
 
     socket.on(
       'aim',
@@ -1475,14 +1625,16 @@ io.on(
           game &&
           ok() &&
           d
-        )
+        ) {
           game.setAim(
             uid,
             d.x,
             d.y
           );
+        }
       }
     );
+
 
     socket.on(
       'shoot',
@@ -1490,10 +1642,14 @@ io.on(
         if (
           game &&
           ok()
-        )
-          game.shoot(uid);
+        ) {
+          game.shoot(
+            uid
+          );
+        }
       }
     );
+
 
     socket.on(
       'reload',
@@ -1501,10 +1657,14 @@ io.on(
         if (
           game &&
           ok()
-        )
-          game.reload(uid);
+        ) {
+          game.reload(
+            uid
+          );
+        }
       }
     );
+
 
     socket.on(
       'switch',
@@ -1512,13 +1672,15 @@ io.on(
         if (
           game &&
           ok()
-        )
+        ) {
           game.switchWeapon(
             uid,
             v
           );
+        }
       }
     );
+
 
     socket.on(
       'start',
@@ -1526,10 +1688,14 @@ io.on(
         if (
           game &&
           ok()
-        )
-          game.start(uid);
+        ) {
+          game.start(
+            uid
+          );
+        }
       }
     );
+
 
     socket.on(
       'lobby',
@@ -1537,12 +1703,14 @@ io.on(
         if (
           game &&
           ok()
-        )
+        ) {
           game.backToLobby(
             uid
           );
+        }
       }
     );
+
 
     socket.on(
       'disconnect',
@@ -1559,6 +1727,7 @@ io.on(
     );
   }
 );
+
 
 /* =========================================================
    CLEAN EMPTY ROOMS
@@ -1581,6 +1750,7 @@ setInterval(
   30000
 );
 
+
 /* =========================================================
    SERVER START
 ========================================================= */
@@ -1591,33 +1761,35 @@ const port =
 
 server.listen(
   port,
-  () =>
+  () => {
     console.log(
       `🐉 China Chaos läuft auf http://localhost:${port}`
-    )
+    );
+  }
 );
+
 
 /* =========================================================
    DISCORD BOT
 ========================================================= */
 
 if (
-  process.env
-    .RUN_DISCORD_BOT !==
+  process.env.RUN_DISCORD_BOT !==
   'false'
 ) {
   startBot()
-    .catch(e =>
+    .catch(e => {
       console.error(
         'Bot:',
         e.message
-      )
-    );
+      );
+    });
 } else {
   console.log(
     '🌐 Render-Modus: Discord Bot deaktiviert'
   );
 }
+
 
 /* =========================================================
    CLEAN SHUTDOWN
