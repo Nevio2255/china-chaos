@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   build-windows:
-    name: Build China Chaos Windows
+    name: Build Windows EXE
     runs-on: windows-latest
 
     steps:
@@ -24,27 +24,30 @@ jobs:
           node-version: "22"
           cache: "npm"
 
-      - name: 📦 Dependencies installieren
+      - name: 📦 Projekt-Abhängigkeiten installieren
         run: npm install --no-audit --no-fund
 
-      - name: 🌐 Web-Version testen
-        run: npm run build
+      - name: ⚡ Electron installieren
+        run: npm install --no-save --no-audit --no-fund electron@35.7.5 electron-builder@26.15.3 electron-updater@6.6.2
 
-      - name: 🔍 Desktop-Dateien prüfen
+      - name: 🔎 Electron prüfen
         shell: powershell
         run: |
+          Write-Host "Electron:"
+          npx electron --version
+
+          Write-Host "Electron Builder:"
+          npx electron-builder --version
+
           if (!(Test-Path "desktop/main.cjs")) {
-            Write-Error "desktop/main.cjs fehlt!"
+            Write-Error "desktop/main.cjs fehlt."
             exit 1
           }
 
           Write-Host "desktop/main.cjs gefunden."
 
-          if (Test-Path "desktop/icon.ico") {
-            Write-Host "China Chaos Icon gefunden."
-          } else {
-            Write-Warning "desktop/icon.ico wurde nicht gefunden."
-          }
+      - name: 🌐 Web-Version bauen
+        run: npm run build
 
       - name: 🐉 Windows Installer bauen
         shell: powershell
@@ -56,95 +59,99 @@ jobs:
             --publish never `
             --config.npmRebuild=false
 
-      - name: 🔎 Build-Dateien anzeigen
+      - name: 📁 Release-Dateien sammeln
         shell: powershell
         run: |
-          Write-Host ""
-          Write-Host "========================================"
-          Write-Host "        CHINA CHAOS WINDOWS BUILD"
-          Write-Host "========================================"
-          Write-Host ""
+          New-Item `
+            -ItemType Directory `
+            -Force `
+            -Path "release-files" | Out-Null
 
-          if (Test-Path "dist-desktop") {
-            Get-ChildItem "dist-desktop" -Recurse
-          } elseif (Test-Path "dist") {
-            Get-ChildItem "dist" -Recurse
-          } else {
-            Write-Error "Kein Build-Ordner gefunden."
-            exit 1
-          }
-
-      - name: 📁 Release-Dateien vorbereiten
-        shell: powershell
-        run: |
-          New-Item -ItemType Directory -Force -Path release-files | Out-Null
-
-          $folders = @(
+          $searchFolders = @(
             "dist-desktop",
             "dist"
           )
 
           $installerFound = $false
 
-          foreach ($folder in $folders) {
+          foreach ($folder in $searchFolders) {
+
             if (!(Test-Path $folder)) {
               continue
             }
 
-            $installers = Get-ChildItem $folder `
+            Write-Host "Prüfe $folder..."
+
+            $installers = Get-ChildItem `
+              -Path $folder `
               -Filter "*.exe" `
               -File `
               -Recurse |
               Where-Object {
-                $_.Name -notmatch "unpacked"
+                $_.FullName -notmatch "win-unpacked"
               }
 
-            foreach ($installer in $installers) {
-              Copy-Item $installer.FullName `
-                -Destination "release-files/$($installer.Name)" `
+            foreach ($file in $installers) {
+
+              Write-Host "Installer gefunden:"
+              Write-Host $file.FullName
+
+              Copy-Item `
+                $file.FullName `
+                -Destination "release-files/$($file.Name)" `
                 -Force
 
-              Write-Host "EXE gefunden: $($installer.Name)"
               $installerFound = $true
             }
 
-            $latest = Get-ChildItem $folder `
+            $latestFiles = Get-ChildItem `
+              -Path $folder `
               -Filter "latest.yml" `
               -File `
               -Recurse
 
-            foreach ($file in $latest) {
-              Copy-Item $file.FullName `
+            foreach ($file in $latestFiles) {
+
+              Write-Host "Auto-Update Datei gefunden:"
+              Write-Host $file.FullName
+
+              Copy-Item `
+                $file.FullName `
                 -Destination "release-files/latest.yml" `
                 -Force
-
-              Write-Host "latest.yml gefunden."
             }
 
-            $blocks = Get-ChildItem $folder `
+            $blockmaps = Get-ChildItem `
+              -Path $folder `
               -Filter "*.blockmap" `
               -File `
               -Recurse
 
-            foreach ($file in $blocks) {
-              Copy-Item $file.FullName `
+            foreach ($file in $blockmaps) {
+
+              Write-Host "Blockmap gefunden:"
+              Write-Host $file.FullName
+
+              Copy-Item `
+                $file.FullName `
                 -Destination "release-files/$($file.Name)" `
                 -Force
-
-              Write-Host "Blockmap gefunden: $($file.Name)"
             }
           }
 
           if (!$installerFound) {
-            Write-Error "Keine Windows Setup EXE gefunden."
+            Write-Error "Keine China Chaos Setup EXE gefunden."
             exit 1
           }
 
           Write-Host ""
-          Write-Host "Release-Dateien:"
-          Get-ChildItem release-files
+          Write-Host "=============================="
+          Write-Host "CHINA CHAOS RELEASE DATEIEN"
+          Write-Host "=============================="
 
-      - name: 📤 Windows Build als Artifact hochladen
+          Get-ChildItem "release-files"
+
+      - name: 📤 Windows-Version hochladen
         uses: actions/upload-artifact@v4
         with:
           name: China-Chaos-Windows
@@ -156,11 +163,11 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          name: China Chaos ${{ github.ref_name }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
           files: |
             release-files/*.exe
             release-files/*.yml
             release-files/*.blockmap
-          generate_release_notes: true
-          name: China Chaos ${{ github.ref_name }}
-          draft: false
-          prerelease: false
