@@ -41,6 +41,118 @@
     html.desktop-app #desktopBtn {
       display: none !important;
     }
+
+    /* =========================================================
+       STORY INTRO
+    ========================================================= */
+    #storyIntro {
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 45%, rgba(170, 18, 42, .26), transparent 38%),
+        linear-gradient(180deg, rgba(4, 0, 2, .90), rgba(18, 2, 7, .98));
+    }
+
+    #storyIntro .storyWrap {
+      position: relative;
+      width: min(900px, calc(100vw - 36px));
+      min-height: 560px;
+      padding: 44px 34px 34px;
+      box-sizing: border-box;
+      border: 1px solid rgba(244, 197, 66, .28);
+      border-radius: 28px;
+      background: rgba(15, 3, 8, .76);
+      box-shadow:
+        0 30px 90px rgba(0, 0, 0, .58),
+        inset 0 0 80px rgba(150, 10, 30, .08);
+      backdrop-filter: blur(18px);
+      text-align: center;
+    }
+
+    #storyIntro .storyBadge {
+      display: inline-block;
+      padding: 8px 14px;
+      border: 1px solid rgba(244, 197, 66, .38);
+      border-radius: 999px;
+      color: #f4c542;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 2px;
+    }
+
+    #storyIntro .storyDragon {
+      margin: 28px 0 8px;
+      font-size: clamp(64px, 9vw, 112px);
+      filter: drop-shadow(0 0 28px rgba(255, 54, 82, .42));
+      animation: storyDragonFloat 3s ease-in-out infinite;
+    }
+
+    #storyIntro h1 {
+      margin: 0;
+      font-size: clamp(38px, 6vw, 72px);
+      line-height: .95;
+      letter-spacing: 3px;
+    }
+
+    #storyIntro h1 span {
+      color: #f4c542;
+    }
+
+    #storySubtitle {
+      min-height: 90px;
+      margin: 30px auto 22px;
+      max-width: 760px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: clamp(18px, 2.2vw, 27px);
+      line-height: 1.45;
+      font-weight: 700;
+      text-shadow: 0 2px 16px #000;
+    }
+
+    #storyProgress {
+      width: min(650px, 90%);
+      height: 8px;
+      margin: 0 auto 25px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: rgba(255,255,255,.10);
+    }
+
+    #storyProgress i {
+      display: block;
+      width: 0%;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #9d152d, #f4c542);
+      box-shadow: 0 0 20px rgba(244, 197, 66, .42);
+    }
+
+    #storyIntro .storyActions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    #storyStartBtn {
+      display: none;
+    }
+
+    #storyIntro.waiting #storyStartBtn {
+      display: inline-flex;
+    }
+
+    #storyIntro.waiting #storySkipBtn {
+      opacity: .75;
+    }
+
+    @keyframes storyDragonFloat {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50% { transform: translateY(-10px) scale(1.03); }
+    }
+
   </style>
 </head>
 
@@ -399,6 +511,61 @@
 </section>
 
 
+
+<!-- =========================================================
+     DIE GESCHICHTE / INTRO
+========================================================= -->
+
+<section
+  id="storyIntro"
+  class="screen"
+>
+  <div class="storyWrap">
+    <div class="storyBadge">
+      🐉 DIE GESCHICHTE HINTER CHINA CHAOS
+    </div>
+
+    <div class="storyDragon">
+      🐉
+    </div>
+
+    <h1>
+      CHINA <span>CHAOS</span>
+    </h1>
+
+    <div id="storySubtitle">
+      Willkommen bei China Chaos!
+    </div>
+
+    <div id="storyProgress">
+      <i id="storyProgressFill"></i>
+    </div>
+
+    <div class="storyActions">
+      <button
+        class="btn big"
+        id="storyStartBtn"
+      >
+        ▶ INTRO STARTEN
+      </button>
+
+      <button
+        class="btn"
+        id="storySkipBtn"
+      >
+        ÜBERSPRINGEN
+      </button>
+    </div>
+  </div>
+
+  <audio
+    id="storyAudio"
+    preload="auto"
+    src="/assets/audio/intro.mp3"
+  ></audio>
+</section>
+
+
 <!-- =========================================================
      HAUPTMENÜ
 ========================================================= -->
@@ -452,6 +619,15 @@
   >
     🔊 SOUND AN
   </button>
+
+
+  <button
+    class="btn"
+    id="storyBtn"
+  >
+    📖 DIE GESCHICHTE
+  </button>
+
 
   <!--
     Nur im normalen Browser sichtbar.
