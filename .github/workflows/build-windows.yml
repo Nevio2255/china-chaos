@@ -1,0 +1,51 @@
+name: 🐉 China Chaos Windows Build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    name: Build Windows EXE
+    runs-on: windows-latest
+
+    steps:
+      - name: 📥 Repository laden
+        uses: actions/checkout@v4
+
+      - name: 🟢 Node.js 22 installieren
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: 📦 Dependencies installieren
+        run: npm ci
+
+      - name: 🌐 Web-Version bauen
+        run: npm run build
+
+      - name: 📦 Electron Builder installieren
+        run: npm install --save-dev electron electron-builder
+
+      - name: 🐉 China Chaos EXE bauen
+        run: npx electron-builder --win nsis
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+      - name: 🔎 Build-Dateien anzeigen
+        shell: powershell
+        run: |
+          Write-Host "=== Windows Build ==="
+          Get-ChildItem -Path dist-desktop -Recurse -ErrorAction SilentlyContinue
+
+      - name: 📤 Windows-Version hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: China-Chaos-Windows
+          path: |
+            dist-desktop/*.exe
+          if-no-files-found: error
+          retention-days: 30
