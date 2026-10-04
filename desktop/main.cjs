@@ -40,8 +40,9 @@ function createWindow() {
 
     backgroundColor: '#09070a',
 
-    // desktop/icon.ico
-    icon: path.join(__dirname, 'icon.ico'),
+    // ICON:
+    // desktop/build/icon.ico
+    icon: path.join(__dirname, 'build', 'icon.ico'),
 
     show: false,
 
@@ -52,10 +53,8 @@ function createWindow() {
     }
   });
 
-  // China Chaos laden
   mainWindow.loadURL(GAME_URL);
 
-  // Erst anzeigen, wenn das Fenster bereit ist
   mainWindow.once('ready-to-show', () => {
     if (!mainWindow || mainWindow.isDestroyed()) return;
 
@@ -63,19 +62,17 @@ function createWindow() {
     mainWindow.focus();
   });
 
-  // Links behandeln
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     try {
       const target = new URL(url);
+      const gameOrigin = new URL(GAME_URL).origin;
 
-      // China Chaos intern öffnen
-      if (target.origin === new URL(GAME_URL).origin) {
+      if (target.origin === gameOrigin) {
         return {
           action: 'allow'
         };
       }
 
-      // Discord darf ebenfalls intern geöffnet werden
       if (
         target.hostname === 'discord.com' ||
         target.hostname.endsWith('.discord.com')
@@ -85,7 +82,6 @@ function createWindow() {
         };
       }
 
-      // Alles andere im normalen Browser öffnen
       shell.openExternal(url);
 
       return {
@@ -98,10 +94,12 @@ function createWindow() {
     }
   });
 
-  // Auto-Update erst prüfen, wenn die Seite geladen wurde
   mainWindow.webContents.on('did-finish-load', () => {
     if (!app.isPackaged) {
-      console.log('Development-Modus: Auto-Update deaktiviert.');
+      console.log(
+        'Development-Modus: Auto-Update deaktiviert.'
+      );
+
       return;
     }
 
@@ -112,7 +110,9 @@ function createWindow() {
     updateStarted = true;
 
     setTimeout(() => {
-      console.log('Suche nach China Chaos Updates...');
+      console.log(
+        'Suche nach China Chaos Updates...'
+      );
 
       autoUpdater
         .checkForUpdates()
@@ -134,110 +134,136 @@ function createWindow() {
 
 
 // ============================================================
-// AUTO UPDATER
+// AUTO UPDATE
 // ============================================================
 
 autoUpdater.autoDownload = true;
+
 autoUpdater.autoInstallOnAppQuit = true;
 
 
-// Update wird gesucht
-autoUpdater.on('checking-for-update', () => {
-  console.log('Suche nach Update...');
+autoUpdater.on(
+  'checking-for-update',
+  () => {
+    console.log(
+      'Suche nach Update...'
+    );
 
-  sendUpdate('checking');
-});
-
-
-// Neue Version gefunden
-autoUpdater.on('update-available', (info) => {
-  console.log(
-    `Neue China Chaos Version gefunden: ${info.version}`
-  );
-
-  sendUpdate('available', {
-    version: info.version
-  });
-});
+    sendUpdate('checking');
+  }
+);
 
 
-// Bereits aktuell
-autoUpdater.on('update-not-available', (info) => {
-  const version =
-    info?.version ||
-    app.getVersion();
+autoUpdater.on(
+  'update-available',
+  (info) => {
+    console.log(
+      `Neue China Chaos Version gefunden: ${info.version}`
+    );
 
-  console.log(
-    `China Chaos ist aktuell: ${version}`
-  );
-
-  sendUpdate('current', {
-    version
-  });
-});
-
-
-// Download-Fortschritt
-autoUpdater.on('download-progress', (progress) => {
-  const percent = Math.round(
-    progress?.percent || 0
-  );
-
-  console.log(
-    `Update Download: ${percent}%`
-  );
-
-  sendUpdate('downloading', {
-    percent
-  });
-});
+    sendUpdate(
+      'available',
+      {
+        version: info.version
+      }
+    );
+  }
+);
 
 
-// Update fertig heruntergeladen
+autoUpdater.on(
+  'update-not-available',
+  (info) => {
+    const version =
+      info?.version ||
+      app.getVersion();
+
+    console.log(
+      `China Chaos ist aktuell: ${version}`
+    );
+
+    sendUpdate(
+      'current',
+      {
+        version
+      }
+    );
+  }
+);
+
+
+autoUpdater.on(
+  'download-progress',
+  (progress) => {
+    const percent = Math.round(
+      progress?.percent || 0
+    );
+
+    console.log(
+      `Update Download: ${percent}%`
+    );
+
+    sendUpdate(
+      'downloading',
+      {
+        percent
+      }
+    );
+  }
+);
+
+
 autoUpdater.on(
   'update-downloaded',
   async (info) => {
-
     console.log(
-      `Update ${info.version} wurde heruntergeladen.`
+      `China Chaos ${info.version} wurde heruntergeladen.`
     );
 
-    sendUpdate('ready', {
-      version: info.version
-    });
-
-    if (!mainWindow || mainWindow.isDestroyed()) {
-      return;
-    }
-
-    const result = await dialog.showMessageBox(
-      mainWindow,
+    sendUpdate(
+      'ready',
       {
-        type: 'info',
-
-        title: 'China Chaos Update bereit',
-
-        message:
-          `China Chaos ${info.version} ist bereit.`,
-
-        detail:
-          'Das Update wurde vollständig heruntergeladen. ' +
-          'Starte China Chaos jetzt neu, um die neue Version zu installieren.',
-
-        buttons: [
-          'Jetzt neu starten',
-          'Später'
-        ],
-
-        defaultId: 0,
-        cancelId: 1,
-        noLink: true
+        version: info.version
       }
     );
 
+    if (
+      !mainWindow ||
+      mainWindow.isDestroyed()
+    ) {
+      return;
+    }
+
+    const result =
+      await dialog.showMessageBox(
+        mainWindow,
+        {
+          type: 'info',
+
+          title:
+            'China Chaos Update bereit',
+
+          message:
+            `China Chaos ${info.version} ist bereit.`,
+
+          detail:
+            'Das Update wurde vollständig heruntergeladen. ' +
+            'Starte China Chaos jetzt neu, um die neue Version zu installieren.',
+
+          buttons: [
+            'Jetzt neu starten',
+            'Später'
+          ],
+
+          defaultId: 0,
+          cancelId: 1,
+          noLink: true
+        }
+      );
+
     if (result.response === 0) {
       console.log(
-        'China Chaos wird für das Update neu gestartet...'
+        'Update wird installiert...'
       );
 
       setImmediate(() => {
@@ -251,21 +277,23 @@ autoUpdater.on(
 );
 
 
-// Update-Fehler
-autoUpdater.on('error', (error) => {
-  console.error(
-    'China Chaos Auto-Update Fehler:',
-    error?.stack ||
-    error?.message ||
-    error
-  );
+autoUpdater.on(
+  'error',
+  (error) => {
+    console.error(
+      'China Chaos Auto-Update Fehler:',
+      error?.stack ||
+      error?.message ||
+      error
+    );
 
-  sendUpdate('error');
-});
+    sendUpdate('error');
+  }
+);
 
 
 // ============================================================
-// ELECTRON
+// ELECTRON APP
 // ============================================================
 
 app.whenReady().then(() => {
@@ -273,17 +301,23 @@ app.whenReady().then(() => {
 });
 
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
+app.on(
+  'window-all-closed',
+  () => {
+    if (process.platform !== 'darwin') {
+      app.quit();
+    }
   }
-});
+);
 
 
-app.on('activate', () => {
-  if (
-    BrowserWindow.getAllWindows().length === 0
-  ) {
-    createWindow();
+app.on(
+  'activate',
+  () => {
+    if (
+      BrowserWindow.getAllWindows().length === 0
+    ) {
+      createWindow();
+    }
   }
-});
+);
