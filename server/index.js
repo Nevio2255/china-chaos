@@ -5,7 +5,9 @@ function loadSystem(){try{return {...{maintenance:false,version:'5.1.0',notes:''
 let systemState=loadSystem();
 function saveSystem(){try{fs.mkdirSync(path.dirname(systemFile),{recursive:true});fs.writeFileSync(systemFile,JSON.stringify(systemState,null,2))}catch(e){console.error('System-State:',e.message)}}
 setSystemStateProvider(()=>systemState);
-const dist=path.join(path.dirname(fileURLToPath(import.meta.url)),'../client/dist');const app=express();app.set('trust proxy',1);app.disable('x-powered-by');app.use(express.json({limit:'10kb'}));app.use('/api',rateLimit({windowMs:60000,limit:180}));
+const clientDir=path.join(rootDir,'../client');
+const indexFile=path.join(clientDir,'index.html');
+const app=express();app.set('trust proxy',1);app.disable('x-powered-by');app.use(express.json({limit:'10kb'}));app.use('/api',rateLimit({windowMs:60000,limit:180}));
 app.get('/api/config',(_,res)=>res.json({clientId:process.env.DISCORD_CLIENT_ID||'',discordRequired:true,version:systemState.version}));
 app.get('/api/system',(_,res)=>res.json({...systemState,desktopAvailable:fs.existsSync(path.join(rootDir,'../downloads/ChinaChaos-Setup.exe'))}));
 app.get('/download/windows',(req,res)=>{const fp=path.join(rootDir,'../downloads/ChinaChaos-Setup.exe');if(fs.existsSync(fp))return res.download(fp,`ChinaChaos-${systemState.version}-Setup.exe`);res.status(200).type('html').send(`<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>China Chaos Desktop</title><style>*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(circle at 50% 10%,#3a0914 0,#0a0204 42%,#050102 100%);color:#fff;font-family:Segoe UI,sans-serif}.c{width:min(680px,100%);padding:38px;border:1px solid #f4c54255;border-radius:28px;background:#17060bea;box-shadow:0 30px 90px #000b;text-align:center}.d{font-size:64px}h1{font-size:42px;margin:10px 0;color:#f4c542}p{color:#d5bdc2;line-height:1.6}.tag{display:inline-block;padding:8px 12px;border-radius:999px;background:#f4c54216;border:1px solid #f4c54244;color:#ffe49a;font-weight:800}.btn{display:inline-block;margin-top:20px;padding:13px 22px;border-radius:12px;background:linear-gradient(#df1839,#8f0b22);border:1px solid #f4c542;color:#fff;text-decoration:none;font-weight:900}.small{font-size:12px;color:#816f74;margin-top:20px}</style></head><body><main class="c"><div class="d">🐉🖥️</div><span class="tag">DESKTOP EDITION</span><h1>China Chaos für Windows</h1><p>Die Desktop-App ist im Projekt bereits vorbereitet. Der Windows-Installer muss einmal über den mitgelieferten GitHub-Workflow gebaut und als <b>ChinaChaos-Setup.exe</b> veröffentlicht werden.</p><p>Bis dahin kannst du die vollständige aktuelle Version direkt im Browser spielen.</p><a class="btn" href="/">JETZT IM BROWSER SPIELEN</a><div class="small">Version ${systemState.version} • Dein Discord-Account funktioniert in beiden Versionen.</div></main></body></html>`)});
@@ -15,7 +17,17 @@ app.get('/auth/link',(req,res)=>{const u=verifySigned(req.query.ticket);if(!u)re
 app.get('/login',(req,res)=>{const base=(process.env.GAME_URL||`${req.protocol}://${req.get('host')}`).replace(/\/$/,'');const redirect=process.env.DISCORD_REDIRECT_URI||`${base}/auth/discord/callback`;const state=crypto.randomBytes(24).toString('hex');res.setHeader('Set-Cookie',`cc_oauth_state=${state}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600`);const q=new URLSearchParams({client_id:process.env.DISCORD_CLIENT_ID||'',response_type:'code',redirect_uri:redirect,scope:'identify',state});res.redirect(`https://discord.com/oauth2/authorize?${q}`)});
 app.get('/auth/discord/callback',async(req,res)=>{try{const state=parseCookies(req.headers.cookie).cc_oauth_state;if(!state||state!==String(req.query.state||''))return res.status(400).send('Ungültige Anmeldung.');const base=(process.env.GAME_URL||`${req.protocol}://${req.get('host')}`).replace(/\/$/,'');const redirect=process.env.DISCORD_REDIRECT_URI||`${base}/auth/discord/callback`;const tr=await fetch('https://discord.com/api/oauth2/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({client_id:process.env.DISCORD_CLIENT_ID||'',client_secret:process.env.DISCORD_CLIENT_SECRET||'',grant_type:'authorization_code',code:String(req.query.code||''),redirect_uri:redirect})});const td=await tr.json();if(!tr.ok||!td.access_token)return res.status(401).send('Discord-Anmeldung fehlgeschlagen.');const ur=await fetch('https://discord.com/api/users/@me',{headers:{Authorization:`Bearer ${td.access_token}`}});const d=await ur.json();if(!ur.ok||!d.id)return res.status(401).send('Discord-Profil konnte nicht geladen werden.');const u={id:String(d.id),name:cleanName(d.global_name||d.username),avatar:avatarUrl(d)};upsertProfile(u);res.setHeader('Set-Cookie',[sessionCookie(u),'cc_oauth_state=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0']);res.redirect('/')}catch(e){console.error('OAuth:',e);res.status(500).send('Discord-Anmeldung fehlgeschlagen.')}});
 app.post('/api/logout',(req,res)=>{res.setHeader('Set-Cookie',clearSessionCookie());res.json({ok:true})});
-app.use(express.static(dist));const server=http.createServer(app),io=new Server(server,{maxHttpBufferSize:4096,cors:{origin:false}}),rooms=new Map();
+app.use(express.static(clientDir));
+
+app.get('/',(req,res)=>{
+  if(!fs.existsSync(indexFile)){
+    console.error('client/index.html fehlt:',indexFile);
+    return res.status(500).send('China Chaos: client/index.html fehlt.');
+  }
+  res.sendFile(indexFile);
+});
+
+const server=http.createServer(app),io=new Server(server,{maxHttpBufferSize:4096,cors:{origin:false}}),rooms=new Map();
 
 // ---- Admin panel: server-side IP allowlist + optional password ----
 const ADMIN_IP=process.env.ADMIN_ALLOWED_IP||'178.39.54.112';
