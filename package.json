@@ -1,16 +1,24 @@
 {
   "name": "china-chaos",
-  "version": "1.0.0",
+  "version": "5.2.0",
+  "description": "China Chaos - Multiplayer Arcade Game",
+  "author": "China Chaos",
   "private": true,
   "type": "module",
+  "main": "desktop/main.cjs",
+
   "engines": {
     "node": "22.x"
   },
+
   "scripts": {
     "build": "vite build client",
     "start": "vite build client && node server/index.js",
-    "start:prod": "node server/index.js"
+    "start:prod": "node server/index.js",
+    "desktop": "electron desktop/main.cjs",
+    "desktop:build": "electron-builder --win nsis --publish never"
   },
+
   "dependencies": {
     "@discord/embedded-app-sdk": "^1.4.0",
     "better-sqlite3": "^11.3.0",
@@ -21,5 +29,47 @@
     "socket.io": "^4.8.0",
     "socket.io-client": "^4.8.0",
     "vite": "^5.4.0"
+  },
+
+  "devDependencies": {
+    "electron": "^35.7.5",
+    "electron-builder": "^26.15.3"
+  },
+
+  "build": {
+    "appId": "com.chinachaos.game",
+    "productName": "China Chaos",
+
+    "directories": {
+      "output": "dist-desktop"
+    },
+
+    "files": [
+      "desktop/**/*"
+    ],
+
+    "asar": true,
+
+    "npmRebuild": false,
+
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "ChinaChaos-Setup-${version}.${ext}"
+    },
+
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "China Chaos"
+    }
   }
 }
