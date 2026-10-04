@@ -817,6 +817,122 @@ $('#storyBtn').onclick =
   };
 
 
+
+/* =========================================================
+   V6 UI / PROGRESSION
+========================================================= */
+const CC_PROGRESS_KEY = 'ccV6Progress';
+
+function loadProgress() {
+  try {
+    return {
+      xp: 0,
+      coins: 0,
+      rounds: 0,
+      wins: 0,
+      battleKills: 0,
+      deaths: 0,
+      bestCombo: 0,
+      dailyStreak: 0,
+      lastDaily: '',
+      title: 'Chaos Player',
+      ...JSON.parse(localStorage.getItem(CC_PROGRESS_KEY) || '{}')
+    };
+  } catch {
+    return {xp:0,coins:0,rounds:0,wins:0,battleKills:0,deaths:0,bestCombo:0,dailyStreak:0,lastDaily:'',title:'Chaos Player'};
+  }
+}
+
+let progress = loadProgress();
+
+function saveProgress() {
+  localStorage.setItem(CC_PROGRESS_KEY, JSON.stringify(progress));
+  renderV6Progress();
+}
+
+function levelFromXp(xp) {
+  return Math.max(1, Math.floor(Math.sqrt(Math.max(0, xp) / 180)) + 1);
+}
+
+function renderV6Progress() {
+  const level = levelFromXp(progress.xp);
+  const seasonXp = progress.xp % 5000;
+  const seasonLevel = Math.floor(seasonXp / 500) + 1;
+  const seasonPct = (seasonXp % 500) / 5;
+
+  if ($('#menuName')) $('#menuName').textContent = meProfile?.name || name || 'Spieler';
+  if ($('#menuWelcome')) $('#menuWelcome').textContent = meProfile?.name || name || 'Spieler';
+  if ($('#menuLevel')) $('#menuLevel').textContent = level;
+  if ($('#menuTitle')) $('#menuTitle').textContent = progress.title;
+  if ($('#menuCoins')) $('#menuCoins').textContent = progress.coins;
+  if ($('#menuXp')) $('#menuXp').textContent = progress.xp;
+  if ($('#seasonLevelPreview')) $('#seasonLevelPreview').textContent = seasonLevel;
+  if ($('#seasonLevel')) $('#seasonLevel').textContent = seasonLevel;
+  if ($('#seasonXp')) $('#seasonXp').textContent = seasonXp;
+  if ($('#seasonPreviewBar')) $('#seasonPreviewBar').style.width = `${seasonPct}%`;
+  if ($('#seasonBar')) $('#seasonBar').style.width = `${seasonPct}%`;
+  if ($('#questPreviewBar')) $('#questPreviewBar').style.width = `${Math.min(100,(progress.rounds%2)*50)}%`;
+
+  const av = $('#menuAvatar');
+  if (av && meProfile?.avatar) av.innerHTML = `<img src="${esc(meProfile.avatar)}" alt="">`;
+
+  const quests = [
+    ['🎮 Spiele 2 Runden', progress.rounds % 2, 2, '+200 XP'],
+    ['🪙 Sammle 500 Coins', progress.coins % 500, 500, '+150 XP'],
+    ['⚔️ Mache 10 Battle-Kills', progress.battleKills % 10, 10, '+250 XP'],
+    ['🏆 Gewinne eine Runde', progress.wins % 1, 1, '+300 XP']
+  ];
+  if ($('#questList')) $('#questList').innerHTML = quests.map(q => `<div class="ccFeatureItem"><b>${q[0]}</b><small>${q[1]}/${q[2]} · ${q[3]}</small><div class="ccProgress"><i style="width:${Math.min(100,q[1]/q[2]*100)}%"></i></div></div>`).join('');
+
+  const badges = [
+    ['🐉 Dragon Master', progress.wins >= 10],
+    ['⚔️ Battle Legend', progress.battleKills >= 50],
+    ['🪙 Coin King', progress.coins >= 5000],
+    ['🔥 Chaos Player', true],
+    ['👑 Season 1 Warrior', seasonLevel >= 5]
+  ];
+  if ($('#badgeList')) $('#badgeList').innerHTML = badges.map(([b,on]) => `<div class="ccFeatureItem"><b>${b}</b><small>${on?'✅ Freigeschaltet':'🔒 Noch gesperrt'}</small></div>`).join('');
+
+  const kd = progress.deaths ? (progress.battleKills/progress.deaths).toFixed(2) : progress.battleKills.toFixed(2);
+  if ($('#profileStatsGrid')) $('#profileStatsGrid').innerHTML = [
+    ['Level',level],['XP',progress.xp],['Runden',progress.rounds],['Siege',progress.wins],
+    ['Battle-Kills',progress.battleKills],['Tode',progress.deaths],['K/D',kd],['Beste Combo',progress.bestCombo]
+  ].map(([a,b])=>`<div class="ccFeatureItem"><small>${a}</small><b style="font-size:25px">${b}</b></div>`).join('');
+}
+
+function todayKey() {
+  return new Date().toISOString().slice(0,10);
+}
+
+$('#dailyClaimBtn')?.addEventListener('click', () => {
+  const today = todayKey();
+  if (progress.lastDaily === today) {
+    toast('Daily Reward heute schon abgeholt.');
+    return;
+  }
+  progress.lastDaily = today;
+  progress.dailyStreak = Math.min(7, (progress.dailyStreak || 0) + 1);
+  const reward = 100 + progress.dailyStreak * 50;
+  progress.coins += reward;
+  progress.xp += 100;
+  saveProgress();
+  if ($('#dailyText')) $('#dailyText').textContent = `Tag ${progress.dailyStreak}/7 · +${reward} Coins + 100 XP abgeholt`;
+  sfx.power();
+});
+
+function openPlay(battle = false) {
+  show('groups');
+  if (battle) localStorage.setItem('ccQuickMode','battle');
+  else localStorage.removeItem('ccQuickMode');
+}
+
+$('#heroPlayBtn')?.addEventListener('click',()=>openPlay(false));
+$('#heroBattleBtn')?.addEventListener('click',()=>openPlay(true));
+$('#battleQuickBtn')?.addEventListener('click',()=>openPlay(true));
+
+renderV6Progress();
+
+
 /* =========================================================
    PRELOAD
 ========================================================= */
@@ -1721,6 +1837,8 @@ function sync() {
     S.phase === 'over'
   ) {
 
+    trackFinishedRound();
+
     $('#overDifficulty').textContent =
       battle
         ? `⚔️ BATTLE · ${
@@ -1994,6 +2112,40 @@ function sync() {
 }
 
 
+
+let lastTrackedResult = '';
+
+function trackFinishedRound() {
+  if (!S || S.phase !== 'over' || !room) return;
+
+  const key =
+    `${room}:${S.mode}:${S.finishReason}:${JSON.stringify(S.ranking || [])}`;
+
+  if (key === lastTrackedResult) return;
+  lastTrackedResult = key;
+
+  const mine =
+    S.ranking?.find(
+      p => p.id === myId
+    );
+
+  progress.rounds += 1;
+
+  if (mine) {
+    if (S.ranking?.[0]?.id === myId) progress.wins += 1;
+    progress.coins += Number(mine.coins || 0);
+    progress.battleKills += Number(mine.kills || 0);
+    progress.deaths += Number(mine.deaths || 0);
+    progress.bestCombo = Math.max(progress.bestCombo, Number(mine.bestCombo || 0));
+    progress.xp += S.mode === 'battle'
+      ? 120 + Number(mine.kills || 0) * 25
+      : 100 + Math.floor(Number(mine.score || 0) / 10);
+  }
+
+  saveProgress();
+}
+
+
 /* =========================================================
    LOBBY CONTROLS
 ========================================================= */
@@ -2038,8 +2190,23 @@ $('#lobbyBtn').onclick =
     sfx.click();
 
     socket.emit(
-      'lobby'
+      'leaveRoom'
     );
+
+    room = '';
+    S = null;
+    prevS = null;
+    localTaken.clear();
+
+    document.body
+      .classList
+      .remove(
+        'playing',
+        'battle'
+      );
+
+    show('start');
+    renderV6Progress();
   };
 
 
